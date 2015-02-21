@@ -16,7 +16,7 @@ class User(object):
         self.username = username
         self.password_digest = password_digest
         self.additional_info = additional_info
-        self.roles = roles
+        self.roles = set(roles) if roles else set()
 
     def check_password(self, password):
         pwd_digest = hashlib.sha1(password.encode()).hexdigest()

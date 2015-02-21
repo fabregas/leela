@@ -2,6 +2,7 @@
 import aiohttp
 import asyncio
 import unittest
+import json
 
 from core import *
 
@@ -45,6 +46,14 @@ class B(A):
     def test_secret(self, data, http_req):
         return 'SECRET'
 
+    @reg_get('top_secret', authorization('testrole', 'superrole'))
+    def test_topsecret(self, data, http_req):
+        return 'TOP SECRET'
+
+    @reg_get('super_secret', authorization('superrole'))
+    def test_supersecret(self, data, http_req):
+        return 'SUPER SECRET'
+
 loop = asyncio.get_event_loop()
 DB = InMemoryDatabase()
 SM = InMemorySessionsManager()
@@ -66,7 +75,7 @@ class TestBasicAPI(unittest.TestCase):
 
         payload = {'key1': 'value1', 'key2': 'value2'}
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/incoming', 
-                                        data=payload) 
+                                        data=json.dumps(payload)) 
         self.assertEqual(r.status, 200)
         data = yield from r.json()
         self.assertEqual(data, True)
@@ -112,13 +121,22 @@ class TestBasicAPI(unittest.TestCase):
         print (r.reason)
 
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__auth__',
-                                data={'username': 'kst', 'password': '123'}) 
+                                data=json.dumps({'username': 'kst', 'password': '123'})) 
         self.assertEqual(r.status, 401, r.reason)
         self.assertEqual(r.reason, 'User does not found')
 
         DB.add_user(User.create('kst', '123', ['testrole']))
+
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__auth__',
-                                data={'username': 'kst', 'password': '123'}) 
+                                data=json.dumps({'username': 'kstt', 'password': '123'})) 
+        self.assertEqual(r.status, 401, r.reason)
+
+        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__auth__',
+                                data=json.dumps({'username': 'kst', 'password': '1223'})) 
+        self.assertEqual(r.status, 401, r.reason)
+
+        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__auth__',
+                                data=json.dumps({'username': 'kst', 'password': '123'})) 
         self.assertEqual(r.status, 200, r.reason)
         cookies = r.cookies
         print('COOKIES 1:', r.cookies)
@@ -130,17 +148,24 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(SM.count(), 1)
 
 
+        r = yield from aiohttp.request('get', 'http://0.0.0.0:6666/api/top_secret', cookies=cookies) 
+        self.assertEqual(r.status, 200, r.reason)
+
+        r = yield from aiohttp.request('get', 'http://0.0.0.0:6666/api/super_secret', cookies=cookies) 
+        self.assertEqual(r.status, 401, r.reason)
+        self.assertEqual(r.reason, 'Permission denied')
+
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__auth__',
-                                data={'username': 'kst', 'password': '123'}) 
+                                data=json.dumps({'username': 'kst', 'password': '123'})) 
         self.assertEqual(r.status, 200, r.reason)
         cookies = r.cookies
         print('COOKIES 2:', r.cookies)
         self.assertEqual(SM.count(), 2)
 
-        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__terminate__') 
+        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__logout__') 
         self.assertEqual(r.status, 401, r.reason)
 
-        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__terminate__', cookies=cookies) 
+        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__logout__', cookies=cookies) 
         self.assertEqual(r.status, 200, r.reason)
         self.assertEqual(SM.count(), 1)
 

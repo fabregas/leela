@@ -1,7 +1,7 @@
 
 from aiohttp import web
 from .database import AbstractDatabase
-from .core import reg_get, reg_post
+from .core import reg_get, reg_post, reg_api
 
 
 class AService(object):
@@ -9,6 +9,7 @@ class AService(object):
         if not isinstance(database, AbstractDatabase):
             raise RuntimeError('Invalid database instance!')
         self.database = database
+        self.db = database  # alias 
 
     def mandatory_check(self, data, *keys):
         for key in keys:
@@ -50,7 +51,7 @@ class AService(object):
 
         return web.Response()
 
-    @reg_post('__terminate__')
+    @reg_post('__logout__')
     def util_terminate(self, data, http_req):
         data.session.need_remove = True
         return web.Response()

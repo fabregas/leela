@@ -58,9 +58,10 @@ class reg_api(object):
                 raise web.HTTPUnauthorized()
 
             if self.allowed_roles:
-                allowed = user.roles() & self.allowed_roles
+                allowed = user.roles & self.allowed_roles
+
                 if not allowed:
-                    raise web.HTTPUnauthorized()
+                    raise web.HTTPUnauthorized(reason='Permission denied')
         return session
 
     def _postcheck_session(self, response, session):
@@ -119,7 +120,12 @@ class reg_post(reg_api):
 
     @asyncio.coroutine
     def _parse_request(self, request):
-        data = yield from request.post()
+        data = yield from request.content.read()
+        if data:
+            data = json.loads(data.decode())
+        else:
+            data = {}
+
         ret = UserData()
         for key in iter(data):
             ret[key] = data.get(key)
