@@ -1,7 +1,9 @@
 
 from aiohttp import web
-from .database import AbstractDatabase
 from .core import reg_get, reg_post, reg_api
+from .sessions import User
+from .orm import Model
+from .orm import AbstractDatabase
 
 
 class AService(object):
@@ -10,6 +12,7 @@ class AService(object):
             raise RuntimeError('Invalid database instance!')
         self.database = database
         self.db = database  # alias 
+        Model.init(database)
 
     def mandatory_check(self, data, *keys):
         for key in keys:
@@ -40,7 +43,7 @@ class AService(object):
     def util_auth(self, data, http_req):
         self.mandatory_check(data, 'username', 'password')
 
-        user = self.database.get_user(data['username'])
+        user = yield from User.get(data['username'])
         if not user:
             raise web.HTTPUnauthorized(reason='User does not found')
 

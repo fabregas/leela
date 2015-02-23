@@ -58,7 +58,7 @@ class reg_api(object):
                 raise web.HTTPUnauthorized()
 
             if self.allowed_roles:
-                allowed = user.roles & self.allowed_roles
+                allowed = user.get_roles() & self.allowed_roles
 
                 if not allowed:
                     raise web.HTTPUnauthorized(reason='Permission denied')

@@ -2,11 +2,37 @@
 import time
 import string
 import random
+import pickle
+import hashlib
+
+from .orm import Model
 
 
 DEFAULT_EXPIRE_TIME = 60*60*24*30  # 30 days
 
 SESSION_USER = '_user_'
+
+
+class User(Model):
+    _id = 'username'
+
+    username = None
+    password_digest = None
+    roles = []
+    additional_info = {}
+
+    def get_roles(self):
+        return set(self.roles) if self.roles else set()
+
+    def check_password(self, password):
+        pwd_digest = hashlib.sha1(password.encode()).hexdigest()
+        return pwd_digest == self.password_digest
+
+    @classmethod
+    def create(cls, username, password, roles, **additional_info):
+        pwd_digest = hashlib.sha1(password.encode()).hexdigest()
+        return User(username=username, password_digest=pwd_digest, roles=roles,
+                    additional_info=additional_info)
 
 
 class Session(object):
@@ -35,6 +61,13 @@ class Session(object):
 
     def _set_user(self, user):
         self.set(SESSION_USER, user)
+
+    def dump(self):
+        return pickle.dumps(self)
+
+    @classmethod
+    def load(self, dump):
+        return pickle.loads(dump)
 
     user = property(_get_user, _set_user)
 

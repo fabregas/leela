@@ -5,6 +5,9 @@ import unittest
 import json
 
 from core import *
+from db_support.inmemory import InMemoryDatabase 
+#from db_support.mongo import MongoDB as InMemoryDatabase 
+
 
 class A(AService):
     def __init__(self, db, a):
@@ -55,7 +58,11 @@ class B(A):
         return 'SUPER SECRET'
 
 loop = asyncio.get_event_loop()
-DB = InMemoryDatabase()
+DB = InMemoryDatabase('leela_test')
+conn = DB.connect()
+loop.run_until_complete(conn)
+loop.run_until_complete(DB.drop_database())
+
 SM = InMemorySessionsManager()
 srv = run_server(B(DB, 2222, 4444), '0.0.0.0', 6666,
                  sessions_manager=SM)
@@ -125,7 +132,8 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(r.status, 401, r.reason)
         self.assertEqual(r.reason, 'User does not found')
 
-        DB.add_user(User.create('kst', '123', ['testrole']))
+        user = User.create('kst', '123', ['testrole'])
+        yield from user.save()
 
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__auth__',
                                 data=json.dumps({'username': 'kstt', 'password': '123'})) 
