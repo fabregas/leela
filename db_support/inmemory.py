@@ -3,6 +3,7 @@
 import asyncio
 from core.orm import AbstractDatabase, QueryResult, model_iterator
 
+
 class InMemoryQueryResult(QueryResult):
     def __init__(self, db, model_class, query):
         self.__query = query
@@ -56,4 +57,3 @@ class InMemoryDatabase(AbstractDatabase):
         if model_name not in self.__data:
             return None
         return self.__data[model_name].get(key, None)
-

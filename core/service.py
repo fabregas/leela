@@ -11,7 +11,7 @@ class AService(object):
         if not isinstance(database, AbstractDatabase):
             raise RuntimeError('Invalid database instance!')
         self.database = database
-        self.db = database  # alias 
+        self.db = database  # alias
         Model.init(database)
 
     def mandatory_check(self, data, *keys):
