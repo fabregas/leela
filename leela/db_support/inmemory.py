@@ -1,7 +1,7 @@
 
 
 import asyncio
-from core.orm import AbstractDatabase, QueryResult, model_iterator
+from leela.core.orm import AbstractDatabase, QueryResult, model_iterator
 
 
 class InMemoryQueryResult(QueryResult):

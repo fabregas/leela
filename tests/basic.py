@@ -4,9 +4,9 @@ import asyncio
 import unittest
 import json
 
-from core import *
-from db_support.inmemory import InMemoryDatabase 
-#from db_support.mongo import MongoDB as InMemoryDatabase 
+from leela.core import *
+from leela.db_support.inmemory import InMemoryDatabase 
+#from leela.db_support.mongo import MongoDB as InMemoryDatabase 
 
 
 class A(AService):

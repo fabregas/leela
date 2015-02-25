@@ -4,8 +4,8 @@ import asyncio
 import unittest
 import json
 
-from core import *
-from db_support.mongo import MongoDB, MongoQueryResult
+from leela.core import *
+from leela.db_support.mongo import MongoDB, MongoQueryResult
 
 loop = asyncio.get_event_loop()
 
