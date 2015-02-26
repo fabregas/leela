@@ -1,18 +1,37 @@
 
+import asyncio
 from aiohttp import web
 from .core import reg_get, reg_post, reg_api
-from .sessions import User
+from .sessions import User, InMemorySessionsManager
 from .orm import Model
 from .orm import AbstractDatabase
 
 
 class AService(object):
+    __sessions_manager = None
+
+    @classmethod
+    def initialize(cls, configuration):
+        '''key-value configration from YAML'''
+        raise RuntimeError('Not implemented!')
+
+    @classmethod
+    def get_sessions_manager(cls):
+        if cls.__sessions_manager is None:
+            cls.__sessions_manager = InMemorySessionsManager()
+        return cls.__sessions_manager
+
     def __init__(self, database):
         if not isinstance(database, AbstractDatabase):
             raise RuntimeError('Invalid database instance!')
         self.database = database
         self.db = database  # alias
         Model.init(database)
+
+    @asyncio.coroutine
+    def destroy(self):
+        '''you should implement your 'destructor' in this method'''
+        yield from self.database.disconnect()
 
     def mandatory_check(self, data, *keys):
         for key in keys:

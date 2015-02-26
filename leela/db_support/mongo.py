@@ -81,6 +81,7 @@ class MongoDB(AbstractDatabase):
         for collection in collections:
             yield from self.__db.drop_collection(collection)
 
+    @asyncio.coroutine
     def disconnect(self):
         if self.__conn is not None:
             closed = yield from self.__conn.disconnect()

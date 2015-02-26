@@ -3,6 +3,8 @@ import json
 import asyncio
 from aiohttp import web
 
+from leela.utils import logger
+
 COOKIE_SESSION_ID = 'session_id'
 
 
@@ -106,6 +108,7 @@ class reg_api(object):
             raise RuntimeError('Service should be instance of AService, '
                                'but {}'.format(service))
         cls.__service = service
+        cls.setup_sessions_manager(service.get_sessions_manager())
 
     @classmethod
     def setup_sessions_manager(cls, sessions_manager):

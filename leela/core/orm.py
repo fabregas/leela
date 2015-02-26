@@ -150,5 +150,9 @@ class AbstractDatabase(object):
         pass
 
     @asyncio.coroutine
+    def disconnect(self):
+        pass
+
+    @asyncio.coroutine
     def drop_database(self):
         pass

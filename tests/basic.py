@@ -34,6 +34,11 @@ class A(AService):
         return self.__incoming
 
 class B(A):
+    @classmethod
+    @asyncio.coroutine
+    def initialize(cls, config):
+        return cls(DB, 2222, 4444)
+
     def __init__(self, db, a, b):
         super().__init__(db, a)
         self.__b = b
@@ -63,9 +68,11 @@ conn = DB.connect()
 loop.run_until_complete(conn)
 loop.run_until_complete(DB.drop_database())
 
-SM = InMemorySessionsManager()
-srv = run_server(B(DB, 2222, 4444), '0.0.0.0', 6666,
-                 sessions_manager=SM)
+app = Application()
+loop.run_until_complete(app.init_service_class(B, {}))
+app.handle_static('.')
+srv = app.make_tcp_server('127.0.0.1', 6666)
+SM = B.get_sessions_manager()
 
 def async_test(f):
     def wrapper(*args, **kwargs):
@@ -182,5 +189,5 @@ class TestBasicAPI(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-    srv.close()
+    app.destroy()
 
