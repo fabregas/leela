@@ -16,6 +16,7 @@ class Application(object):
     def __init__(self):
         self.__app = web.Application()
         self.__service = None
+        self.__unixsocket = None
 
     def set_logger_config(self, logger_config_path):
         try:
@@ -86,14 +87,17 @@ class Application(object):
         return loop.run_until_complete(future)
 
     def make_unix_server(self, path):
+        self.__unixsocket = path
         loop = asyncio.get_event_loop()
-        future = loop.create_unix_connection(self.__app.make_handler(), path)
+        future = loop.create_unix_server(self.__app.make_handler(), path)
         return loop.run_until_complete(future)
 
+    @asyncio.coroutine
     def destroy(self):
         if not self.__service:
             return
-        loop = asyncio.get_event_loop()
-        cor = self.__service.destroy()
-        loop.run_until_complete(cor)
+
+        yield from self.__service.destroy()
         self.__service = None
+        if self.__unixsocket:
+            os.unlink(self.__unixsocket)

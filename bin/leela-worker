@@ -1,0 +1,85 @@
+#!/usr/bin/python
+
+import os
+import sys
+import logging
+import logging.config
+import asyncio
+import signal
+import json
+import functools
+
+from leela.core.application import Application
+from leela.utils.logger import logger
+
+
+def main(name, project_home, logger_config_file, srv_endpoint, srv_config,
+         is_ssl, bind_addr, is_unixsocket):
+
+    sys.path.append(os.path.join(project_home, 'services'))
+
+    if logger_config_file != '--noconf':
+        app.set_logger_config(logger_config_file)
+
+    logger.info('[{}] starting service...'.format(name))
+    try:
+        future = app.init_service(srv_endpoint, srv_config)
+        loop.run_until_complete(future)
+        
+        static_path = os.path.join(project_home, 'www')
+        app.handle_static(static_path)
+
+        if is_unixsocket:
+            app.make_unix_server(bind_addr)
+        else:
+            parts = bind_addr.split(':')
+            parts.append(80)
+            host, port = parts[:2]
+            app.make_tcp_server(host, port)
+
+        logger.info('[{}] service started'.format(name))
+
+        try:
+            loop.run_forever()
+        except KeyboardInterrupt:
+            pass
+    finally:
+        pass
+
+@asyncio.coroutine
+def stop(s='', n=''):
+    global stopped
+    if stopped:
+        return
+    stopped = True
+
+    loop.stop()
+    logger.info('[{}] destroing service...'.format(name))
+    try:
+        yield from app.destroy()
+    except Exception as err:
+        logger.error('[{}] destroy routine failed: {}'.format(name, err))
+    logger.info('[{}] finished'.format(name))
+    loop.close()
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print('DONT RUN THIS SCRIPT MANUALLY!')
+        sys.exit(1)
+
+    try:
+        stopped = False
+        loop = asyncio.get_event_loop()
+        loop.add_signal_handler(signal.SIGINT, lambda: asyncio.async(stop(signal.SIGINT)))
+
+        app = Application()
+        name = sys.argv[1]
+
+        args = json.loads(input())
+
+        main(name, args[0], args[1], args[2],
+             args[3], args[4], args[5], args[6])
+    except Exception as err:
+        logger.error('[{}] global exception: {}'.format(name, err))
+        sys.exit(3)

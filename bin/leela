@@ -1,0 +1,207 @@
+#!/usr/bin/python
+
+import os
+import yaml
+
+import leela
+from leela.utils import dispatcher_daemon
+from leela.utils.config import LeelaConfig
+
+INDEX_HTML = '''<html>
+  <body>
+    <h1>Hello, Leela</h1>
+  </body>
+</html>
+'''
+
+TEST_YAML = '''leela:
+    bind_address: 127.0.0.1:8080
+    monitor_changes: true
+    nginx_proxy: false
+    leela_proc_count: 1
+    logger_config: logger-test.yaml
+    daemonize: false
+    service:
+        endpoint: service.py
+        config:
+            db_name: {}_test_db
+'''
+
+PRODUCTION_YAML = '''leela:
+    bind_address: 0.0.0.0:8080
+    monitor_changes: true
+    leela_proc_count: -1
+    logger_config: logger-production.yaml
+    nginx_proxy: true
+    nginx_exec: /usr/sbin/nginx
+    service:
+        endpoint: service.py
+        config:
+            db_name: {}_prod_db
+'''
+
+SERVICE_PY = '''#!/usr/bin/python
+
+from leela.core import *
+from leela.db_support.mongo import MongoDB
+
+class MyService(AService):
+    @classmethod
+    def initialize(cls, config):
+        if 'db_name' not in config:
+            raise RuntimeError('db_name does not found in YAML config')
+        db = MongoDB(config.get('db_name', None))
+        yield from db.connect(config.get('db_hostname', '127.0.0.1'),
+                              config.get('db_port', 27017))
+
+        Model.init(db)
+
+        return cls(db)
+
+    # TODO: implement your API here...
+'''
+
+LOGGING_CFG_TEST = '''
+version: 1
+formatters:
+    verbose:
+        format: '%(levelname)s %(module)s %(process)d %(message)s'
+    simple:
+        format: '%(levelname)s %(message)s'
+handlers:
+    console:
+        level: INFO
+        class: logging.StreamHandler
+        formatter: simple
+    syslog:
+        level: INFO
+        class: logging.handlers.SysLogHandler
+        address: '/dev/log'
+        formatter: verbose
+loggers:
+    leela:
+        handlers: [console, syslog]
+        level: INFO
+    asyncio_mongo:
+        handlers: [console]
+        level: INFO
+    aiohttp.access:
+        handlers: [console]
+        level: INFO
+    aiohttp.server:
+        handlers: [console]
+        level: INFO
+'''
+
+LOGGING_CFG_PROD = '''
+version: 1
+formatters:
+    verbose:
+        format: '%(levelname)s %(module)s %(process)d %(message)s'
+handlers:
+    syslog:
+        level: INFO
+        class: logging.handlers.SysLogHandler
+        address: '/dev/log'
+        formatter: verbose
+loggers:
+    leela:
+        handlers: [syslog]
+        level: INFO
+    asyncio_mongo:
+        handlers: [syslog]
+        level: INFO
+    aiohttp.access:
+        handlers: [syslog]
+        level: INFO
+    aiohttp.server:
+        handlers: [syslog]
+        level: WARNING
+'''
+
+
+def start_project(base_path, project_name):
+    if not os.path.exists(base_path):
+        raise RuntimeError('Path {} does not found'.format(base_path))
+
+    path = os.path.join(base_path, project_name)
+    if os.path.exists(path):
+        raise RuntimeError('Path {} is already exists'.format(path))
+
+    os.mkdir(path)
+    for folder in ('www/templates', 'www/js', 'www/css', 'www/img',
+                   'config', 'services'):
+        os.makedirs(os.path.join(path, folder))
+
+    open(os.path.join(path, 'www/index.html'), 'w').write(INDEX_HTML)
+    open(os.path.join(path, 'services/service.py'), 'w').write(SERVICE_PY)
+    open(os.path.join(path, 'config/test.yaml'),
+         'w').write(TEST_YAML.format(project_name))
+    open(os.path.join(path, 'config/logger-test.yaml'),
+         'w').write(LOGGING_CFG_TEST)
+    open(os.path.join(path, 'config/logger-production.yaml'),
+         'w').write(LOGGING_CFG_PROD)
+    open(os.path.join(path, 'config/production.yaml'),
+         'w'). write(PRODUCTION_YAML.format(project_name))
+
+    leela_js = os.path.join(os.path.dirname(leela.__file__),
+                            'angular/leela.js')
+    open(os.path.join(path, 'www/js/leela.js'),
+         'w').write(open(leela_js).read())
+
+    print('='*80)
+    print('New Leela project is started at {}'.format(path))
+    print('='*80)
+    print(' -> write your home HTML in www/index.html file')
+    print(' -> save your HTML templates (for angularjs) '
+          'in www/templates directory')
+    print(' -> save your javascript scripts in www/js directory')
+    print(' -> save your css files in www/css directory')
+    print(' -> save your static images into www/img directory')
+    print('='*80)
+
+
+def _check_param(config, param):
+    if type(config) != dict or param not in config:
+        raise ValueError('<{}> scope is expected in YAML file.'.format(param))
+
+
+def start_server(project_path, config_name):
+    if not os.path.exists(project_path):
+        raise RuntimeError('Project directory "{}" does not exists'
+                           .format(project_path))
+
+    config_file = os.path.join(project_path, 'config', config_name + '.yaml')
+    if not os.path.exists(config_file):
+        raise RuntimeError('Config file "{}" does not exists'
+                           .format(config_file))
+
+    try:
+        config = yaml.load(open(config_file))
+        lconfig = LeelaConfig(project_path)
+        lconfig.parse(config)
+    except Exception as err:
+        raise RuntimeError('Config file parse error: {}'.format(err))
+    
+    bin_dir = os.path.abspath(os.path.dirname(__file__))
+
+    try:
+        dispatcher_daemon.start(bin_dir, project_path, lconfig)
+    except RuntimeError as err:
+        print(err)
+    except KeyboardInterrupt as err:
+        pass
+
+
+def stop_server(project_path):
+    dispatcher_daemon.stop(project_path)
+
+
+import sys
+if sys.argv[1] == 'start':
+    os.system('rm -rf /tmp/test_proj')
+    start_project('/tmp', 'test_proj')
+    start_server('/tmp/test_proj', 'production')
+
+if sys.argv[1] == 'stop':
+    stop_server('/tmp/test_proj')
