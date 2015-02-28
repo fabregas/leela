@@ -3,6 +3,7 @@
 import os
 import sys
 import yaml
+import urllib.request
 
 import leela
 from leela.utils import dispatcher_daemon
@@ -121,6 +122,30 @@ loggers:
 '''
 
 
+def install_js_base(js_path):
+    try:
+        print('- downloading leela.js ...')
+        resp = urllib.request.urlopen('https://raw.githubusercontent.com/'
+                                      'fabregas/leela/master/leela/angular'
+                                      '/leela.js')
+        leela_js = resp.read().decode()
+    except urllib.error.URLError as e:
+        raise RuntimeError('leela.js does not found!')
+
+    open(os.path.join(js_path, 'leela.js'), 'w').write(leela_js)
+
+    try:
+        print('- downloading angular.min.js ...')
+        resp = urllib.request.urlopen('https://ajax.googleapis.com/ajax/libs/'
+                                      'angularjs/1.0.6/angular.min.js')
+
+        angular_js = resp.read().decode()
+    except urllib.error.URLError as e:
+        print('WARNING! angular.min.js does not found!')
+
+    open(os.path.join(js_path, 'angular.min.js'), 'w').write(angular_js)
+
+
 def start_project(base_path, project_name):
     if not os.path.exists(base_path):
         raise RuntimeError('Path {} does not found'.format(base_path))
@@ -145,10 +170,7 @@ def start_project(base_path, project_name):
     open(os.path.join(path, 'config/production.yaml'),
          'w'). write(PRODUCTION_YAML.format(project_name))
 
-    leela_js = os.path.join(os.path.dirname(leela.__file__),
-                            'angular/leela.js')
-    open(os.path.join(path, 'www/js/leela.js'),
-         'w').write(open(leela_js).read())
+    install_js_base(os.path.join(path, 'www/js'))
 
     print('='*80)
     print('New Leela project is started at {}'.format(path))
@@ -183,7 +205,7 @@ def start_server(project_path, config_name):
         lconfig.parse(config)
     except Exception as err:
         raise RuntimeError('Config file parse error: {}'.format(err))
-    
+
     bin_dir = os.path.abspath(os.path.dirname(__file__))
 
     try:
@@ -200,6 +222,7 @@ def start_server(project_path, config_name):
 
 def stop_server(project_path):
     dispatcher_daemon.stop(project_path)
+
 
 def usage():
     print('Usage:')
@@ -244,4 +267,3 @@ if __name__ == '__main__':
         sys.exit(1)
     finally:
         pass
-
