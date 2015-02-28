@@ -88,6 +88,8 @@ class Application(object):
 
     def make_unix_server(self, path):
         self.__unixsocket = path
+        if os.path.exists(self.__unixsocket):
+            os.unlink(self.__unixsocket)
         loop = asyncio.get_event_loop()
         future = loop.create_unix_server(self.__app.make_handler(), path)
         return loop.run_until_complete(future)

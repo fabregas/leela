@@ -14,3 +14,6 @@ clean:
 test:
 	@$(TEST_RUNNER)
 
+behave:
+	behave tests/features/
+

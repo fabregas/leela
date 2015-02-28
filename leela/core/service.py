@@ -49,6 +49,8 @@ class AService(object):
             docs = '' if not docs else '-- {}'.format(docs)
             li_list += '<li><b>{}</b>&nbsp;&nbsp;{}&nbsp;&nbsp;{}</li>'\
                        .format(method.upper(), path, docs)
+        if not li_list:
+            li_list = 'No one API method found...'
 
         html = '''<html><body>
                     <h1>Available methods:</h1>

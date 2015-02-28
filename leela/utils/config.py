@@ -2,6 +2,7 @@
 import os
 import sys
 
+
 class LeelaConfig(object):
     def __init__(self, project_path):
         self.__project_path = project_path
@@ -17,14 +18,15 @@ class LeelaConfig(object):
         self.__config['bind_address'] = config['bind_address']
         self.__config['monitor_changes'] = config.get('monitor_changes', False)
         self.__config['leela_proc_count'] = config.get('leela_proc_count', -1)
-        self.__config['is_nginx_proxy'] = config.get('nginx_proxy',
-                                        self.__config['leela_proc_count'] != 1)
+        def_proxy = self.__config['leela_proc_count'] != 1
+        self.__config['is_nginx_proxy'] = config.get('nginx_proxy', def_proxy)
         self.__config['need_daemonize'] = config.get('daemonize', True)
-        self.__config['username'] = config.get('username',
-                                          os.environ.get('SUDO_USER', 'leela'))
+        def_user = os.environ.get('SUDO_USER', 'leela')
+        self.__config['username'] = config.get('username', def_user)
         logger_config = config.get('logger_config', 'logger.yaml')
         self.__config['logger_config_path'] = os.path.join(self.__project_path,
-                                                      'config', logger_config)
+                                                           'config',
+                                                           logger_config)
 
         service_cfg = config['service']
         self.__check_param(service_cfg, 'endpoint')
@@ -32,10 +34,10 @@ class LeelaConfig(object):
         self.__config['srv_config'] = service_cfg.get('config', {})
 
         self.__config['python_exec'] = config.get('python_exec',
-                                                  sys.executable)
+                                                  sys.executable or 'python3')
 
         self.__config['nginx_exec'] = config.get('nginx_exec',
-                                                  '/usr/sbin/nginx')
+                                                 '/usr/sbin/nginx')
 
         ssl_config = config.get('ssl', None)
         self.__config['ssl'] = bool(ssl_config)

@@ -3,6 +3,7 @@ import os
 import sys
 import json
 import yaml
+import time
 import signal
 import logging
 import logging.config
@@ -51,8 +52,8 @@ NGINX_NOSSL_CONFIG = '''
     server {
         listen %(running_port)s;
 
-	access_log /tmp/access_log;
-	error_log /tmp/error_log;
+        access_log /dev/null;
+        error_log /tmp/error_log;
 
         location ^~ /  {
             root %(static_path)s;
@@ -78,8 +79,8 @@ NGINX_SSL_CONFIG = '''
         ssl_certificate         %(ssl_cert)s;
         ssl_certificate_key     %(ssl_key)s;
 
-	access_log /tmp/access_log;
-	error_log /tmp/error_log;
+        access_log /dev/null;
+        error_log /tmp/error_log;
 
         location ^~ /  {
             root %(static_path)s;
@@ -103,6 +104,7 @@ NGINX_SSL_ONLY_CONFIG = '''
     }
 '''
 
+
 def _make_nginx_config(username, proj_name, servers, port, static_path,
                        ssl_cert=None, ssl_key=None, ssl_only=False):
     app_servers = ''
@@ -115,12 +117,12 @@ def _make_nginx_config(username, proj_name, servers, port, static_path,
                                          'ssl_key': ssl_key,
                                          'static_path': static_path}
     if ssl_only:
-        nossl_config = NGINX_SSL_ONLY_CONFIG % { 'running_port': port }
+        nossl_config = NGINX_SSL_ONLY_CONFIG % {'running_port': port}
     else:
         nossl_config = NGINX_NOSSL_CONFIG % {'static_path': static_path,
                                              'running_port': port}
 
-    params = {'app_servers': app_servers, 'username': username, 
+    params = {'app_servers': app_servers, 'username': username,
               'ssl_config': ssl_config, 'nossl_config': nossl_config}
     config = NGINX_CFG_TMPL % params
     conf_path = os.path.join(tempfile.gettempdir(),
@@ -162,11 +164,14 @@ class ServiceMgmt:
         self.__input_s = input_s
         if self.__username:
             args = ['su', self.__username, '-s'] + list(args)
+            stderr = asyncio.subprocess.PIPE
+        else:
+            stderr = self.__out
 
         self.__proc = yield from \
             asyncio.create_subprocess_exec(*args,
                                            stdout=self.__out,
-                                           stderr=asyncio.subprocess.PIPE,
+                                           stderr=stderr,
                                            stdin=asyncio.subprocess.PIPE,
                                            env=env)
         self.__stopped = False
@@ -207,59 +212,28 @@ class ServiceMgmt:
         self.__proc = None
 
 
-def start(bin_dir, home_path, config):
-    logger_config_path = config.logger_config_path
-    leela_proc_count = config.leela_proc_count
-    is_nginx_proxy = config.is_nginx_proxy
-    username = config.username
-
-    if os.path.exists(logger_config_path):
-        logging.config.dictConfig(yaml.load(open(logger_config_path)))
-    else:
-        print('WARNING! Logger config does not found at {}'
-              .format(logger_config_path))
-        logger_config_path = '--noconf'
-
-    if leela_proc_count > 1:
-        is_nginx_proxy = True
-
-    if is_nginx_proxy:
-        _check_root(config)
-    else:
-        username = None
-
-    proj_name = os.path.basename(home_path.rstrip('/'))
-    if config.need_daemonize:
-        daemon = Daemon('/tmp/leela-{}.pid'.format(proj_name))
-        daemon.start()
-
-    # with daemon context
-    if leela_proc_count <= 0:
-        leela_proc_count = multiprocessing.cpu_count()
-
-    loop = asyncio.get_event_loop()
+def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
     leela_processes = []
     bind_sockets = []
 
-    for i in range(leela_proc_count):
-        s_mgmt = ServiceMgmt(username)
-        is_unixsocket = is_nginx_proxy
+    for i in range(config.leela_proc_count):
+        s_mgmt = ServiceMgmt(config.username)
+        is_unixsocket = config.is_nginx_proxy
         lp_is_ssl = config.ssl and not is_unixsocket
-        if not is_nginx_proxy:
+        if not config.is_nginx_proxy:
             lp_bind_addr = config.bind_address
         else:
             tmpdir = tempfile.gettempdir()
             tmp_file = os.path.join(tmpdir,
                                     '{}-{}.unixsocket'.format(proj_name, i))
-            if os.path.exists(tmp_file):
-                os.unlink(tmp_file)
             lp_bind_addr = tmp_file
 
         bind_sockets.append(lp_bind_addr)
-        env = { 'PYTHONPATH': os.path.abspath(os.path.dirname(leela.__file__))
-                             .rstrip('leela') }
+        env = {'PYTHONPATH':
+               os.path.abspath(os.path.dirname(leela.__file__)).rstrip('leela')
+               }
 
-        params_str = json.dumps([home_path, logger_config_path,
+        params_str = json.dumps([home_path, config.logger_config_path,
                                  config.srv_endpoint,
                                  config.srv_config, lp_is_ssl,
                                  lp_bind_addr, is_unixsocket])
@@ -272,38 +246,31 @@ def start(bin_dir, home_path, config):
         loop.run_until_complete(cor)
         leela_processes.append(s_mgmt)
 
-
-    try:
-        if is_nginx_proxy:
-            parts = config.bind_address.split(':')
-            if len(parts) == 2:
-                port = parts[1]
-            else:
-                port = 80
-            static_path = os.path.abspath(os.path.join(home_path, 'www'))
-
-            cnf_file = _make_nginx_config(username, proj_name, bind_sockets, port,
-                            static_path, config.ssl_cert, config.ssl_key,
-                            config.ssl_only)
-            nginx_mgmt = ServiceMgmt()
-            cor = nginx_mgmt.start(config.nginx_exec, '-c', cnf_file)
-            loop.run_until_complete(cor)
-            leela_processes.append(nginx_mgmt)
-    except BaseException as err:
-        logger.error('leela daemon failed: {}'.format(err))
-        # FIXME : stop already started services...
+    return leela_processes, bind_sockets
 
 
-    tasks = []
-    for proc in leela_processes:
-        tasks.append(asyncio.async(proc.check_run()))
+def _run_nginx(loop, home_path, proj_name, config,
+               leela_processes,  bind_sockets):
+    if config.is_nginx_proxy:
+        parts = config.bind_address.split(':')
+        if len(parts) == 2:
+            port = parts[1]
+        else:
+            port = 80
+        static_path = os.path.abspath(os.path.join(home_path, 'www'))
 
-    for task in tasks:
-        try:
-            loop.run_until_complete(task)
-        except KeyboardInterrupt:
-            break
+        cnf_file = _make_nginx_config(config.username, proj_name,
+                                      bind_sockets, port,
+                                      static_path, config.ssl_cert,
+                                      config.ssl_key,
+                                      config.ssl_only)
+        nginx_mgmt = ServiceMgmt()
+        cor = nginx_mgmt.start(config.nginx_exec, '-c', cnf_file)
+        loop.run_until_complete(cor)
+        leela_processes.append(nginx_mgmt)
 
+
+def _stop_processes(loop, leela_processes):
     cors = []
     for proc in leela_processes:
         try:
@@ -321,8 +288,84 @@ def start(bin_dir, home_path, config):
         except Exception as err:
             logger.error('proc.stop() faied: {}'.format(err))
 
-    loop.close()
+    # loop.close()
+
+
+@asyncio.coroutine
+def _check_changes(path):
+    cur_time = time.time()
+    print('cur time: ', cur_time)
+    while True:
+        for cur_path, _, files in os.walk(path):
+            for file_name in files:
+                f_path = os.path.join(cur_path, file_name)
+                if not f_path.endswith('.py'):
+                    continue
+                if os.path.getmtime(f_path) > cur_time:
+                    print('detected changed file at {}...'.format(f_path))
+                    return f_path
+        yield from asyncio.sleep(1)
+
+
+def start(bin_dir, home_path, config):
+    if os.path.exists(config.logger_config_path):
+        logging.config.dictConfig(yaml.load(open(config.logger_config_path)))
+    else:
+        print('WARNING! Logger config does not found at {}'
+              .format(config.logger_config_path))
+        config.logger_config_path = '--noconf'
+
+    if config.leela_proc_count <= 0:
+        config.leela_proc_count = multiprocessing.cpu_count()
+    if config.leela_proc_count > 1:
+        config.is_nginx_proxy = True
+
+    if config.is_nginx_proxy:
+        _check_root(config)
+    else:
+        config.username = None
+
+    proj_name = os.path.basename(home_path.rstrip('/'))
+    if config.need_daemonize:
+        daemon = Daemon('/tmp/leela-{}.pid'.format(proj_name))
+        daemon.start()
+
+    # with daemon context
+    leela_processes = []
+    bind_sockets = []
+    try:
+        loop = asyncio.get_event_loop()
+        leela_processes, bind_sockets = _run_leela_processes(loop, bin_dir,
+                                                             home_path,
+                                                             proj_name,
+                                                             config)
+
+        _run_nginx(loop, home_path, proj_name, config,
+                   leela_processes,  bind_sockets)
+    except BaseException as err:
+        logger.error('leela daemon failed: {}'.format(err))
+        _stop_processes(loop, leela_processes)
+        return
+
+    retcode = 1
+    try:
+        if config.monitor_changes:
+            cor = _check_changes(os.path.join(home_path, 'services'))
+            loop.run_until_complete(cor)
+        else:
+            tasks = []
+            for proc in leela_processes:
+                tasks.append(asyncio.async(proc.check_run()))
+
+            for task in tasks:
+                loop.run_until_complete(task)
+    except KeyboardInterrupt:
+        retcode = 0
+
+    _stop_processes(loop, leela_processes)
+
     print('Done.')
+    return retcode
 
 
 def stop(home_path):

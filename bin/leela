@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os
+import sys
 import yaml
 
 import leela
@@ -186,7 +187,11 @@ def start_server(project_path, config_name):
     bin_dir = os.path.abspath(os.path.dirname(__file__))
 
     try:
-        dispatcher_daemon.start(bin_dir, project_path, lconfig)
+        while True:
+            retcode = dispatcher_daemon.start(bin_dir, project_path, lconfig)
+            if lconfig.monitor_changes and retcode == 1:
+                continue
+            break
     except RuntimeError as err:
         print(err)
     except KeyboardInterrupt as err:
@@ -196,12 +201,47 @@ def start_server(project_path, config_name):
 def stop_server(project_path):
     dispatcher_daemon.stop(project_path)
 
+def usage():
+    print('Usage:')
+    print('leela new-project <project name> [<base path>]')
+    print('  or')
+    print('leela start <configuration name> [<project path>]')
+    print('  or')
+    print('leela stop [<project path>]')
 
-import sys
-if sys.argv[1] == 'start':
-    os.system('rm -rf /tmp/test_proj')
-    start_project('/tmp', 'test_proj')
-    start_server('/tmp/test_proj', 'production')
+    sys.exit(1)
 
-if sys.argv[1] == 'stop':
-    stop_server('/tmp/test_proj')
+if __name__ == '__main__':
+    if len(sys.argv) < 3:
+        usage()
+
+    try:
+        if sys.argv[1] == 'new-project':
+            if len(sys.argv) > 3:
+                cur = sys.argv[3]
+            else:
+                cur = '.'
+
+            start_project(cur, sys.argv[2])
+        elif sys.argv[1] == 'start':
+            if len(sys.argv) > 3:
+                cur = sys.argv[3]
+            else:
+                cur = '.'
+
+            start_server(cur, sys.argv[2])
+        elif sys.argv[1] == 'stop':
+            if len(sys.argv) > 2:
+                cur = sys.argv[2]
+            else:
+                cur = '.'
+            stop_server(cur)
+        else:
+            usage()
+        sys.exit(0)
+    except Exception as err:
+        print('ERROR: {}'.format(err))
+        sys.exit(1)
+    finally:
+        pass
+
