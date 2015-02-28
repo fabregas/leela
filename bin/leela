@@ -238,26 +238,23 @@ if __name__ == '__main__':
     if len(sys.argv) < 3:
         usage()
 
+    cur = os.path.abspath('.')
+
     try:
         if sys.argv[1] == 'new-project':
             if len(sys.argv) > 3:
                 cur = sys.argv[3]
-            else:
-                cur = '.'
 
             start_project(cur, sys.argv[2])
         elif sys.argv[1] == 'start':
             if len(sys.argv) > 3:
                 cur = sys.argv[3]
-            else:
-                cur = '.'
 
             start_server(cur, sys.argv[2])
         elif sys.argv[1] == 'stop':
             if len(sys.argv) > 2:
                 cur = sys.argv[2]
-            else:
-                cur = '.'
+
             stop_server(cur)
         else:
             usage()
