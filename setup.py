@@ -19,7 +19,6 @@ if __name__ == '__main__':
         scripts=['./bin/leela', './bin/leela-worker'],
         long_description=read('README.md'),
         install_requires=[
-            'yaml',
             'aiohttp',
             'asyncio_mongo'
         ],
