@@ -93,6 +93,23 @@ class TestMongoBackend(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             yield from Log.find(some_other=4)
 
+        
+        #filters
+        for i in range(100):
+            yield from Log(log_msg='msg #%i'%i, log_level=4).save()
+
+        log_objs = yield from Log.find().sort(log_level=1)
+        log_objs = list(log_objs)
+        self.assertEqual(len(list(log_objs)), 103, log_objs)
+        self.assertEqual(log_objs[0].log_msg, 'first msg')
+        self.assertEqual(log_objs[1].log_msg, 'third msg')
+        self.assertEqual(log_objs[2].log_msg, 'second msg')
+
+        log_objs = yield from Log.find().sort(log_msg=-1).limit(1)
+        log_objs = list(log_objs)
+        self.assertEqual(len(log_objs), 1, log_objs)
+        self.assertEqual(log_objs[0].log_msg, 'third msg')
+
 
 if __name__ == '__main__':
     unittest.main()

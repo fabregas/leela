@@ -12,9 +12,8 @@ from leela.core.orm import model_iterator
 class MongoQueryResult(QueryResult):
     def __init__(self, db, model_class, query):
         self.__query = query
-        self.__sort = []
-        self.__hint = []
-        self.__explain = False
+        self.__filter = None
+        self.__limit = None
 
         self.__db = db
         self.__model_class = model_class
@@ -35,19 +34,44 @@ class MongoQueryResult(QueryResult):
     def sort(self, **order):
         '''order = {field: ASC | DESC , ...}
         '''
-        # for field, direction in order.items():
-        #     self.__sort.append(asyncio_mongo.filter.DESCENDING("something"))
+        for field, direction in order.items():
+            if direction < 0:
+                direct = asyncio_mongo.filter.DESCENDING
+            else:
+                direct = asyncio_mongo.filter.ASCENDING
+            sf = asyncio_mongo.filter.sort(direct(field))
+            if not self.__filter:
+                self.__filter = sf
+            else:
+                self.__filter += sf
         return self
 
-    def hint(self, index):
+    def hint(self, index, direction=-1):
+        if direction < 0:
+            direct = asyncio_mongo.filter.DESCENDING
+        else:
+            direct = asyncio_mongo.filter.ASCENDING
+        hint = asyncio_mongo.filter.hint(direct(index))
+        if not self.__filter:
+            self.__filter = hint
+        else:
+            self.__filter += hint
         return self
 
-    def explain(self):
+    def limit(self, cnt):
+        self.__limit = cnt
         return self
 
     def __iter__(self):
         collection = self.__db[self.__metaname]
-        data = yield from collection.find(self.__query)
+        params = {}
+        if self.__limit:
+            params['limit'] = self.__limit
+        if self.__filter:
+            params['filter'] = self.__filter
+
+        data = yield from collection.find(self.__query, **params)
+
         return model_iterator(self.__model_class, data)
 
 
@@ -86,29 +110,4 @@ class MongoDB(AbstractDatabase):
         if self.__conn is not None:
             closed = yield from self.__conn.disconnect()
 
-    def set_session(self, session):
-        key = session.get_id()
-        value = session.dump()
-        yield from self['leela_sessions'].insert({'_id': key, 'value': value})
 
-    def get_session(self, key, default=None):
-        ret = yield from self['leela_sessions'].find_one({'_id': key})
-        if len(ret) == 0:
-            return default
-        return Session.load(ret['value'])
-
-    def del_session(self, session):
-        key = session.get_id()
-        yield from self['leela_sessions'].remove({'_id': key})
-
-    def add_user(self, user):
-        self['leela_users'].insert({'_id'})
-
-    def get_user(self, username):
-        pass
-
-    def update_user(self, user):
-        pass
-
-    def delete_user(self, user):
-        pass
