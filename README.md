@@ -1,7 +1,7 @@
 Leela
 =====
 
-### Yet another framework for web development for Python3
+### Yet another framework for web development in Python3
 #### We are using `asyncio` library for building extreme scalable web applications with extreme concurrency
 
 
