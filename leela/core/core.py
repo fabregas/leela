@@ -16,6 +16,9 @@ class UserData(dict):
     def set_session(self, session):
         self.session = session
 
+    def __getattr__(self, attr):
+        return self[attr]
+
 
 class authorization(object):
     def __init__(self, *roles):
@@ -144,3 +147,23 @@ class reg_get(reg_api):
         for key in iter(request.GET):
             ret[key] = request.GET.get(key)
         return ret
+
+class reg_websocket(reg_get):
+    method = 'GET'
+
+    @asyncio.coroutine
+    def _parse_request(self, request):
+        ret = super()._parse_request(request)
+        ws = web.WebSocketResponse()
+        ok, protocol = ws.can_start(request)
+        if not ok:
+            raise web.HTTPExpectationFailed(reason='Invalid WebSocket')
+        ws.start(request)
+
+        ret.websocket = ws
+        return ret
+
+    def _form_response(self, ret_object):
+        if not isinstance(ret_object, web.WebSocketResponse):
+            raise RuntimeError('Expected WebSocketResponse object as a result')
+        return ret_object
