@@ -167,3 +167,27 @@ class reg_websocket(reg_get):
         if not isinstance(ret_object, web.WebSocketResponse):
             raise RuntimeError('Expected WebSocketResponse object as a result')
         return ret_object
+
+class reg_postfile(reg_post):
+    @asyncio.coroutine
+    def _parse_request(self, request):
+        data = yield from request.post()
+
+        ret = UserData()
+        for key in iter(data):
+            ret[key] = data.get(key)
+        return ret
+
+    def _form_response(self, ret_object):
+        return web.Response()
+
+class reg_uploadstream(reg_post):
+    @asyncio.coroutine
+    def _parse_request(self, request):
+        data = request.content
+        ret = UserData()
+        ret['stream'] = data
+        return ret
+
+    def _form_response(self, ret_object):
+        return web.Response()

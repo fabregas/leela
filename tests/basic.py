@@ -3,6 +3,7 @@ import aiohttp
 import asyncio
 import unittest
 import json
+from datetime import datetime
 
 from leela.core import *
 from leela.db_support.inmemory import InMemoryDatabase 
@@ -34,6 +35,8 @@ class A(AService):
         return self.__incoming
 
 class B(A):
+    FNAME = None
+    FCONT = None
     @classmethod
     @asyncio.coroutine
     def initialize(cls, config):
@@ -61,6 +64,31 @@ class B(A):
     @reg_get('super_secret', authorization('superrole'))
     def test_supersecret(self, data, http_req):
         return 'SUPER SECRET'
+
+    @reg_postfile('some_file')
+    def test_upload(self, data, http_req):
+        t0 = datetime.now()
+
+        self.__class__.FNAME = data.file.filename
+        self.__class__.FCONT = data.file.file.read()
+        data.file.file.close()
+
+        print('some_file proc time: %s'%(datetime.now()-t0))
+
+    @reg_uploadstream('some_str_file')
+    def test_uploadstr(self, data, http_req):
+        t0 = datetime.now()
+
+        h = hashlib.sha1()
+        while True:
+            chunk = yield from data.stream.readany()
+            if not chunk:
+                break
+            h.update(chunk)
+        self.__class__.STREAM_SHA1 = h.hexdigest()
+
+        print('some_str_file proc time: %s'%(datetime.now()-t0))
+
 
 loop = asyncio.get_event_loop()
 DB = InMemoryDatabase('leela_test')
@@ -185,6 +213,25 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(SM.count(), 1)
 
 
+    @async_test
+    def test_fileupload(self):
+        files = {'file': open(__file__, 'rb')}
+        r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/some_file', 
+                                        data=files) 
+        self.assertEqual(r.status, 200)
+
+        self.assertEqual(B.FNAME, 'basic.py')
+        self.assertEqual(B.FCONT, open(__file__, 'rb').read())
+
+
+        with  open(__file__, 'rb') as f:
+            r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/some_str_file',
+                    data = f)
+
+        self.assertEqual(r.status, 200)
+
+        self.assertEqual(B.FNAME, 'basic.py')
+        self.assertEqual(B.STREAM_SHA1, hashlib.sha1(open(__file__, 'rb').read()).hexdigest())
 
 
 if __name__ == '__main__':
