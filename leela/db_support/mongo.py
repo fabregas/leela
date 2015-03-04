@@ -14,6 +14,7 @@ class MongoQueryResult(QueryResult):
         self.__query = query
         self.__filter = None
         self.__limit = None
+        self.__skip = None
 
         self.__db = db
         self.__model_class = model_class
@@ -31,10 +32,18 @@ class MongoQueryResult(QueryResult):
         result = yield from collection.save(self.__query)
         return result
 
+    @asyncio.coroutine
+    def remove(self):
+        collection = self.__db[self.__metaname]
+        result = yield from collection.remove(self.__query)
+        return result
+
     def sort(self, **order):
         '''order = {field: ASC | DESC , ...}
         '''
         for field, direction in order.items():
+            if field == self.__idkey:
+                field = '_id'
             if direction < 0:
                 direct = asyncio_mongo.filter.DESCENDING
             else:
@@ -62,11 +71,17 @@ class MongoQueryResult(QueryResult):
         self.__limit = cnt
         return self
 
+    def skip(self, cnt):
+        self.__skip = cnt
+        return self
+
     def __iter__(self):
         collection = self.__db[self.__metaname]
         params = {}
         if self.__limit:
             params['limit'] = self.__limit
+        if self.__skip:
+            params['skip'] = self.__skip
         if self.__filter:
             params['filter'] = self.__filter
 

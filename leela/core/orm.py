@@ -79,6 +79,14 @@ class Model(object, metaclass=ModelMeta):
         res = yield from ret.upsert()
         return res
 
+    def remove(self):
+        ret = self.__query_result_class(self.__db, self.__class__, self.__args)
+        res = yield from ret.remove()
+        return res
+
+    def to_dict(self):
+        return copy(self.__args)
+
     def __getattribute__(self, attr):
         if attr[0] == '_':
             return super(Model, self).__getattribute__(attr)
@@ -113,6 +121,10 @@ class QueryResult(object):
 
     @asyncio.coroutine
     def upsert(self):
+        pass
+
+    @asyncio.coroutine
+    def remove(self):
         pass
 
     def sort(self, **order):

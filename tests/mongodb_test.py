@@ -105,14 +105,24 @@ class TestMongoBackend(unittest.TestCase):
         self.assertEqual(log_objs[1].log_msg, 'third msg')
         self.assertEqual(log_objs[2].log_msg, 'second msg')
 
-        log_objs = yield from Log.find().sort(log_msg=-1).limit(1)
+        log_objs = yield from Log.find().sort(log_msg=-1).skip(1).limit(1)
         log_objs = list(log_objs)
         self.assertEqual(len(log_objs), 1, log_objs)
-        self.assertEqual(log_objs[0].log_msg, 'third msg')
+        self.assertEqual(log_objs[0].log_msg, 'second msg')
 
         log_objs = yield from Log.find(log_level={'$lt': 4})
         log_objs = list(log_objs)
         self.assertEqual(len(log_objs), 3, log_objs)
+
+        #remove
+        log_objs = yield from Log.find(log_level={'$gt': 3}).remove()
+        log_objs = yield from Log.find()
+        log_objs = list(log_objs)
+        self.assertEqual(len(log_objs), 3, log_objs)
+        yield from log_objs[0].remove()
+        log_objs = yield from Log.find()
+        log_objs = list(log_objs)
+        self.assertEqual(len(log_objs), 2, log_objs)
 
 if __name__ == '__main__':
     unittest.main()
