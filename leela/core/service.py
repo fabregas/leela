@@ -2,24 +2,16 @@
 import asyncio
 from aiohttp import web
 from .core import reg_get, reg_post, reg_api
-from .sessions import User, InMemorySessionsManager
+from .sessions import User
 from .orm import Model
 from .orm import AbstractDatabase
 
 
 class AService(object):
-    __sessions_manager = None
-
     @classmethod
     def initialize(cls, configuration):
         '''key-value configration from YAML'''
         raise RuntimeError('Not implemented!')
-
-    @classmethod
-    def get_sessions_manager(cls):
-        if cls.__sessions_manager is None:
-            cls.__sessions_manager = InMemorySessionsManager()
-        return cls.__sessions_manager
 
     def __init__(self, database):
         if not isinstance(database, AbstractDatabase):
@@ -42,7 +34,7 @@ class AService(object):
     @reg_get('__introspect__')
     def util_introspect_methods(self, data, http_req):
         li_list = ''
-        for method, path, handle, docs in reg_api.get_routes():
+        for method, path, _, docs in reg_api.get_routes():
             if path.startswith('/api/__'):
                 continue
 

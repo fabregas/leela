@@ -2,8 +2,9 @@
 import asyncio
 import asyncio_mongo
 import hashlib
+import pickle
 
-from leela.core.sessions import Session
+from leela.core.sessions import Session, AbstractSessionsManager, DEFAULT_EXPIRE_TIME
 from leela.core.orm import AbstractDatabase
 from leela.core.orm import QueryResult
 from leela.core.orm import model_iterator
@@ -92,11 +93,26 @@ class MongoQueryResult(QueryResult):
 
 class MongoDB(AbstractDatabase):
     _query_result_class = MongoQueryResult
+    __instance = None
 
+    @classmethod
+    def get_instance(cls):
+        if not cls.__instance:
+            raise RuntimeError('MongoDB instance does not initialized!')
+        return cls.__instance
+
+    @classmethod
+    def initialize(cls, db_name):
+        if cls.__instance:
+            return cls.__instance
+
+        return MongoDB(db_name)
+        
     def __init__(self, db_name='leela'):
         super().__init__(db_name)
         self.__conn = None
         self.__db = None
+        self.__class__.__instance = self
 
     def connect(self, host='localhost', port=27017, auto_reconnect=True):
         self.__conn = yield from \
@@ -126,3 +142,51 @@ class MongoDB(AbstractDatabase):
             closed = yield from self.__conn.disconnect()
 
 
+
+class MongoSessionsManager(AbstractSessionsManager):
+    def __init__(self, expire_time=DEFAULT_EXPIRE_TIME):
+        super().__init__(expire_time)
+        self.__db = MongoDB.get_instance()
+
+    @asyncio.coroutine
+    def count(self):
+        cnt = yield from self.__db['leela_sessions'].count({})
+        return cnt
+
+    @asyncio.coroutine
+    def check_sessions(self):
+        pass
+
+    @asyncio.coroutine
+    def get(self, session_id):
+        session = yield from \
+                  self.__db['leela_sessions'].find_one({'_id': session_id})
+
+        if not session:
+            return Session(None)
+        return pickle.loads(session['data'])
+
+    @asyncio.coroutine
+    def set(self, session):
+        session_id = session.get_id()
+        if session_id is None:  # new session
+            while True:
+                session_id = self.random_uid()
+                af = self.__db['leela_sessions'].find_one({'_id': session_id})
+                if af:
+                    break
+
+        self.update_session_time(session)
+        session.set_id(session_id)
+        yield from self.__db['leela_sessions'].save(
+                            {'_id': session_id, 'data': pickle.dumps(session)})
+        session.modified = False
+
+    @asyncio.coroutine
+    def remove(self, session):
+        session_id = session.get_id()
+        if (session_id is None):
+            return False
+
+        yield from self.__db['leela_sessions'].remove({'_id': session_id})
+        return True

@@ -234,8 +234,8 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
                }
 
         params_str = json.dumps([home_path, config.logger_config_path,
-                                 config.srv_endpoint,
-                                 config.srv_config, lp_is_ssl,
+                                 config.services,
+                                 config.sessions_manager, lp_is_ssl,
                                  lp_bind_addr, is_unixsocket])
 
         cor = s_mgmt.start(config.python_exec,

@@ -23,10 +23,10 @@ TEST_YAML = '''leela:
     leela_proc_count: 1
     logger_config: logger-test.yaml
     daemonize: false
-    service:
-        endpoint: service.py
-        config:
-            db_name: {}_test_db
+    services:
+        - endpoint: service.py
+          config:
+             db_name: {}_test_db
 '''
 
 PRODUCTION_YAML = '''leela:
@@ -36,10 +36,12 @@ PRODUCTION_YAML = '''leela:
     logger_config: logger-production.yaml
     nginx_proxy: true
     nginx_exec: /usr/sbin/nginx
-    service:
-        endpoint: service.py
-        config:
-            db_name: {}_prod_db
+    services:
+        - endpoint: service.py
+          config:
+             db_name: {}_prod_db
+    sessions_manager:
+        endpoint: leela.db_support.mongo.MongoSessionsManager
 '''
 
 SERVICE_PY = '''#!/usr/bin/python

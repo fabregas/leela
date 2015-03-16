@@ -15,7 +15,7 @@ from leela.core.service import AService
 class Application(object):
     def __init__(self):
         self.__app = web.Application()
-        self.__service = None
+        self.__services = []
         self.__unixsocket = None
 
     def set_logger_config(self, logger_config_path):
@@ -63,10 +63,29 @@ class Application(object):
 
         reg_api.setup_service(s_instance)
 
+        self.__services.append(s_instance)
+
+    def setup_sessions_manager(self, s_manager_obj_path):
+        parts = s_manager_obj_path.split('.')
+        try:
+            module_name = '.'.join(parts[:-1])
+            module = importlib.import_module(module_name)
+        except ImportError:
+            raise RuntimeError('Module "{}" does not found!'.
+                               format(module_name))
+
+        class_name = parts[-1]
+        if not hasattr(module, class_name):
+            raise RuntimeError('Class "{}" does not found in {}'
+                               .format(class_name, module_name))
+
+        sessions_manager = getattr(module, class_name)()
+        reg_api.setup_sessions_manager(sessions_manager)
+        return sessions_manager
+
+    def __make_router(self):
         for method, path, handle, _ in reg_api.get_routes():
             self.__app.router.add_route(method, path, handle)
-
-        self.__service = s_instance
 
     def handle_static(self, static_path):
         self.__app.router.add_static('/static', static_path)
@@ -82,11 +101,13 @@ class Application(object):
         self.__app.router.add_route('GET', '/', root_handler)
 
     def make_tcp_server(self, host, port):
+        self.__make_router()
         loop = asyncio.get_event_loop()
         future = loop.create_server(self.__app.make_handler(), host, port)
         return loop.run_until_complete(future)
 
     def make_unix_server(self, path):
+        self.__make_router()
         self.__unixsocket = path
         if os.path.exists(self.__unixsocket):
             os.unlink(self.__unixsocket)
@@ -96,10 +117,11 @@ class Application(object):
 
     @asyncio.coroutine
     def destroy(self):
-        if not self.__service:
-            return
+        for service in self.__services:
+            yield from service.destroy()
 
-        yield from self.__service.destroy()
-        self.__service = None
+        self.__services = []
+
         if self.__unixsocket:
             os.unlink(self.__unixsocket)
+        self.__unixsocket = None

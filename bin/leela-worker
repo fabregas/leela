@@ -13,8 +13,8 @@ from leela.core.application import Application
 from leela.utils.logger import logger
 
 
-def main(name, project_home, logger_config_file, srv_endpoint, srv_config,
-         is_ssl, bind_addr, is_unixsocket):
+def main(name, project_home, logger_config_file, services,
+         sessions_mgr_path, is_ssl, bind_addr, is_unixsocket):
 
     sys.path.append(os.path.join(project_home, 'services'))
 
@@ -23,11 +23,16 @@ def main(name, project_home, logger_config_file, srv_endpoint, srv_config,
 
     logger.info('[{}] starting service...'.format(name))
     try:
-        future = app.init_service(srv_endpoint, srv_config)
-        loop.run_until_complete(future)
+        for service in services:
+            future = app.init_service(service['srv_endpoint'],
+                                      service['srv_config'])
+            loop.run_until_complete(future)
         
         static_path = os.path.join(project_home, 'www')
         app.handle_static(static_path)
+
+        if sessions_mgr_path:
+            app.setup_sessions_manager(sessions_mgr_path)
 
         if is_unixsocket:
             app.make_unix_server(bind_addr)
@@ -82,4 +87,7 @@ if __name__ == '__main__':
              args[3], args[4], args[5], args[6])
     except Exception as err:
         logger.error('[{}] global exception: {}'.format(name, err))
+        import traceback
+        logger.write = logger.info
+        traceback.print_exc(file=logger)
         sys.exit(3)

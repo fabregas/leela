@@ -13,7 +13,7 @@ class LeelaConfig(object):
 
         config = config['leela']
         self.__check_param(config, 'bind_address')
-        self.__check_param(config, 'service')
+        self.__check_param(config, 'services')
 
         self.__config['bind_address'] = config['bind_address']
         self.__config['monitor_changes'] = config.get('monitor_changes', False)
@@ -28,16 +28,22 @@ class LeelaConfig(object):
                                                            'config',
                                                            logger_config)
 
-        service_cfg = config['service']
-        self.__check_param(service_cfg, 'endpoint')
-        self.__config['srv_endpoint'] = service_cfg['endpoint']
-        self.__config['srv_config'] = service_cfg.get('config', {})
+        services_cfg = config['services']
+        services = []
+        for s_config in services_cfg:
+            self.__check_param(s_config, 'endpoint')
+            services.append({'srv_endpoint': s_config['endpoint'],
+                             'srv_config': s_config.get('config', {}) })
+        self.__config['services'] = services
 
         self.__config['python_exec'] = config.get('python_exec',
                                                   sys.executable or 'python3')
 
         self.__config['nginx_exec'] = config.get('nginx_exec',
                                                  '/usr/sbin/nginx')
+
+        s_mgr = config.get('sessions_manager', {})
+        self.__config['sessions_manager'] = s_mgr.get('endpoint', None)
 
         ssl_config = config.get('ssl', None)
         self.__config['ssl'] = bool(ssl_config)

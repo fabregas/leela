@@ -4,6 +4,7 @@ import string
 import random
 import pickle
 import hashlib
+import asyncio
 
 from .orm import Model
 
@@ -76,14 +77,30 @@ class AbstractSessionsManager(object):
     def __init__(self, expire_time=DEFAULT_EXPIRE_TIME):
         self.expire_time = expire_time
 
+    def random_uid(self):
+        return ''.join(random.SystemRandom().choice(
+                    string.ascii_letters + string.digits) for _ in range(32))
+
+    def update_session_time(self, session):
+        exp_time = time.time() + self.expire_time
+        session.expire_time = exp_time
+
+    @asyncio.coroutine
     def get(self, session_id):
         '''get session dict'''
         pass
 
+    @asyncio.coroutine
     def set(self, session_id, session):
         '''set session dict'''
         pass
 
+    @asyncio.coroutine
+    def remove(self, session):
+        '''remove session'''
+        pass
+
+    @asyncio.coroutine
     def check_sessions(self):
         '''remove expired sessions'''
         pass
@@ -94,12 +111,15 @@ class InMemorySessionsManager(AbstractSessionsManager):
         super().__init__(expire_time)
         self.__sessions = {}
 
+    @asyncio.coroutine
     def count(self):
         return len(self.__sessions)
 
+    @asyncio.coroutine
     def check_sessions(self):
         pass
 
+    @asyncio.coroutine
     def get(self, session_id):
         session = self.__sessions.get(session_id, None)
         if session:
@@ -108,13 +128,12 @@ class InMemorySessionsManager(AbstractSessionsManager):
         session = Session(None)
         return session
 
+    @asyncio.coroutine
     def set(self, session):
         session_id = session.get_id()
         if session_id is None:  # new session
             while True:
-                session_id = ''.join(random.SystemRandom().choice(
-                                     string.ascii_letters + string.digits)
-                                     for _ in range(32))
+                session_id = self.random_uid()
                 if session_id not in self.__sessions:
                     break
         exp_time = time.time() + self.expire_time
@@ -123,6 +142,7 @@ class InMemorySessionsManager(AbstractSessionsManager):
         self.__sessions[session_id] = session
         session.modified = False
 
+    @asyncio.coroutine
     def remove(self, session):
         session_id = session.get_id()
         if (session_id is None) or (session_id not in self.__sessions):

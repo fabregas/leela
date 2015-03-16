@@ -1,7 +1,9 @@
 
 import json
+import inspect
 import asyncio
 from aiohttp import web
+from .sessions import InMemorySessionsManager
 
 from leela.utils import logger
 
@@ -33,71 +35,94 @@ need_auth = authorization()
 class reg_api(object):
     method = None
     __routes = []
-    __service = None
-    __sessions_manager = None
+    __routes_map = {}
+    __sessions_manager = InMemorySessionsManager()
 
     def __init__(self, path, auth=None):
         self.path = path
         self.need_auth = bool(auth)
         self.allowed_roles = set() if not auth else auth.allowed_roles()
 
+    @classmethod
     @asyncio.coroutine
-    def _parse_request(self, request):
+    def _parse_request(cls, request):
         return UserData()
 
-    def _form_response(self, ret_object):
+    @classmethod
+    def _form_response(cls, ret_object):
         if isinstance(ret_object, web.Response):
             return ret_object
         return web.Response(body=json.dumps(ret_object).encode(),
                             content_type='application/json')
 
-    def _check_session(self, request):
+    @classmethod
+    @asyncio.coroutine
+    def _check_session(cls, request, need_auth, allowed_roles):
         session_id = request.cookies.get(COOKIE_SESSION_ID, None)
 
-        session = self.__sessions_manager.get(session_id)
+        session = yield from cls.__sessions_manager.get(session_id)
 
-        if self.need_auth:
+        if need_auth:
             user = session.user
 
             if not user:
                 raise web.HTTPUnauthorized()
 
-            if self.allowed_roles:
-                allowed = user.get_roles() & self.allowed_roles
+            if allowed_roles:
+                allowed = user.get_roles() & allowed_roles
 
                 if not allowed:
                     raise web.HTTPUnauthorized(reason='Permission denied')
         return session
 
-    def _postcheck_session(self, response, session):
+    @classmethod
+    @asyncio.coroutine
+    def _postcheck_session(cls, response, session):
         if not session:
             return
-        if session.modified:
-            self.__sessions_manager.set(session)
 
-            # TODO: update user cookies IF NEED
-            response.set_cookie(COOKIE_SESSION_ID, session.get_id())
-        elif session.need_remove:
-            found = self.__sessions_manager.remove(session)
+        if session.need_remove:
+            found = yield from cls.__sessions_manager.remove(session)
             if not found:
                 raise web.HTTPUnauthorized(reason='Session does not found')
             response.del_cookie(COOKIE_SESSION_ID)
+        elif session.modified:
+            yield from cls.__sessions_manager.set(session)
+
+            # TODO: update user cookies IF NEED
+            response.set_cookie(COOKIE_SESSION_ID, session.get_id())
 
     def __call__(self, func):
-        def handle(request):
-            coro = asyncio.coroutine(func)
-            session = self._check_session(request)
-            data = yield from self._parse_request(request)
+        func.path = '/api/{}'.format(self.path)
+        func.method = self.method
+        func.need_auth = self.need_auth
+        func.allowed_roles = self.allowed_roles
+        func.is_leela_api = True 
+        func.decorator_class = self.__class__
+
+        return asyncio.coroutine(func)
+
+    @classmethod
+    def _decorate_method(cls, method):
+        def handler(request):
+            dclass = method.decorator_class
+            session = yield from dclass._check_session(request,
+                                                       method.need_auth,
+                                                       method.allowed_roles)
+            data = yield from dclass._parse_request(request)
+
             data.set_session(session)
-            ret = yield from coro(self.__service, data, request)
-            resp = self._form_response(ret)
-            self._postcheck_session(resp, session)
+
+            ret = yield from method(data, request)
+
+            resp = dclass._form_response(ret)
+            yield from dclass._postcheck_session(resp, session)
             return resp
 
-        docs = '' if not func.__doc__ else func.__doc__.strip().split('\n')[0]
-        self.__routes.append((self.method, '/api/{}'.format(self.path), handle,
-                              docs))
-        return func
+        docs = '' if not method.__doc__ \
+                  else method.__doc__.strip().split('\n')[0]
+        cls.__routes.append((method.method, method.path, handler, docs))
+
 
     @classmethod
     def get_routes(cls):
@@ -110,8 +135,14 @@ class reg_api(object):
         if not isinstance(service, AService):
             raise RuntimeError('Service should be instance of AService, '
                                'but {}'.format(service))
-        cls.__service = service
-        cls.setup_sessions_manager(service.get_sessions_manager())
+        s_methods = dir(service)
+        for m_name in s_methods:    
+            method = getattr(service, m_name)
+            if not inspect.ismethod(method):
+                continue
+            if not getattr(method, 'is_leela_api', False): 
+                continue
+            cls._decorate_method(method)
 
     @classmethod
     def setup_sessions_manager(cls, sessions_manager):
@@ -124,8 +155,9 @@ class reg_api(object):
 class reg_post(reg_api):
     method = 'POST'
 
+    @classmethod
     @asyncio.coroutine
-    def _parse_request(self, request):
+    def _parse_request(cls, request):
         data = yield from request.content.read()
         if data:
             data = json.loads(data.decode())
@@ -141,8 +173,9 @@ class reg_post(reg_api):
 class reg_get(reg_api):
     method = 'GET'
 
+    @classmethod
     @asyncio.coroutine
-    def _parse_request(self, request):
+    def _parse_request(cls, request):
         ret = UserData()
         for key in iter(request.GET):
             ret[key] = request.GET.get(key)
@@ -151,8 +184,9 @@ class reg_get(reg_api):
 class reg_websocket(reg_get):
     method = 'GET'
 
+    @classmethod
     @asyncio.coroutine
-    def _parse_request(self, request):
+    def _parse_request(cls, request):
         ret = super()._parse_request(request)
         ws = web.WebSocketResponse()
         ok, protocol = ws.can_start(request)
@@ -163,14 +197,16 @@ class reg_websocket(reg_get):
         ret.websocket = ws
         return ret
 
-    def _form_response(self, ret_object):
+    @classmethod
+    def _form_response(cls, ret_object):
         if not isinstance(ret_object, web.WebSocketResponse):
             raise RuntimeError('Expected WebSocketResponse object as a result')
         return ret_object
 
 class reg_postfile(reg_post):
+    @classmethod
     @asyncio.coroutine
-    def _parse_request(self, request):
+    def _parse_request(cls, request):
         data = yield from request.post()
 
         ret = UserData()
@@ -178,16 +214,19 @@ class reg_postfile(reg_post):
             ret[key] = data.get(key)
         return ret
 
-    def _form_response(self, ret_object):
+    @classmethod
+    def _form_response(cls, ret_object):
         return web.Response()
 
 class reg_uploadstream(reg_post):
+    @classmethod
     @asyncio.coroutine
-    def _parse_request(self, request):
+    def _parse_request(cls, request):
         data = request.content
         ret = UserData()
         ret['stream'] = data
         return ret
 
-    def _form_response(self, ret_object):
+    @classmethod
+    def _form_response(cls, ret_object):
         return web.Response()

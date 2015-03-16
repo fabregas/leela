@@ -7,7 +7,7 @@ from datetime import datetime
 
 from leela.core import *
 from leela.db_support.inmemory import InMemoryDatabase 
-#from leela.db_support.mongo import MongoDB as InMemoryDatabase 
+from leela.db_support.mongo import MongoDB as InMemoryDatabase 
 
 
 class A(AService):
@@ -49,7 +49,7 @@ class B(A):
 
     @reg_get('test_path2')
     def test22(self, data, http_req):
-        ret = self.test(data, http_req)
+        ret = yield from self.test(data, http_req)
         print('test22 func ...', data, ret)
         return ['test sting', 22, self.__b]
 
@@ -99,8 +99,9 @@ loop.run_until_complete(DB.drop_database())
 app = Application()
 loop.run_until_complete(app.init_service_class(B, {}))
 app.handle_static('.')
+#SM = app.setup_sessions_manager('leela.core.sessions.InMemorySessionsManager')
+SM = app.setup_sessions_manager('leela.db_support.mongo.MongoSessionsManager')
 srv = app.make_tcp_server('127.0.0.1', 6666)
-SM = B.get_sessions_manager()
 
 def async_test(f):
     def wrapper(*args, **kwargs):
@@ -188,7 +189,8 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(r.status, 401)
         r = yield from aiohttp.request('get', 'http://0.0.0.0:6666/api/secret', cookies=cookies) 
         self.assertEqual(r.status, 200, r.reason)
-        self.assertEqual(SM.count(), 1)
+        count = yield from SM.count()
+        self.assertEqual(int(count), 1)
 
 
         r = yield from aiohttp.request('get', 'http://0.0.0.0:6666/api/top_secret', cookies=cookies) 
@@ -203,14 +205,16 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(r.status, 200, r.reason)
         cookies = r.cookies
         print('COOKIES 2:', r.cookies)
-        self.assertEqual(SM.count(), 2)
+        count = yield from SM.count()
+        self.assertEqual(int(count), 2)
 
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__logout__') 
         self.assertEqual(r.status, 401, r.reason)
 
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/__logout__', cookies=cookies) 
         self.assertEqual(r.status, 200, r.reason)
-        self.assertEqual(SM.count(), 1)
+        count = yield from SM.count()
+        self.assertEqual(int(count), 1)
 
 
     @async_test
