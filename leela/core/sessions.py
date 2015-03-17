@@ -44,12 +44,18 @@ class Session(object):
         self.modified = False
         self.expire_time = expire_time
 
+    def __setitem__(self, key, value):
+        self.set(key, value)
+
     def set(self, key, value):
         self.__session_data[key] = value
         self.modified = True
 
     def get(self, key, default=None):
         return self.__session_data.get(key, default)
+
+    def pop(self, key, default=None):
+        return self.__session_data.pop(key, default)
 
     def get_id(self):
         return self.__session_id
@@ -63,6 +69,8 @@ class Session(object):
     def _set_user(self, user):
         self.set(SESSION_USER, user)
 
+    user = property(_get_user, _set_user)
+
     def dump(self):
         return pickle.dumps(self)
 
@@ -70,7 +78,7 @@ class Session(object):
     def load(self, dump):
         return pickle.loads(dump)
 
-    user = property(_get_user, _set_user)
+
 
 
 class AbstractSessionsManager(object):

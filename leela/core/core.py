@@ -2,6 +2,7 @@
 import json
 import inspect
 import asyncio
+import traceback
 from aiohttp import web
 from .sessions import InMemorySessionsManager
 
@@ -105,19 +106,27 @@ class reg_api(object):
     @classmethod
     def _decorate_method(cls, method):
         def handler(request):
-            dclass = method.decorator_class
-            session = yield from dclass._check_session(request,
-                                                       method.need_auth,
-                                                       method.allowed_roles)
-            data = yield from dclass._parse_request(request)
+            try:
+                dclass = method.decorator_class
+                session = yield from dclass._check_session(request,
+                                                           method.need_auth,
+                                                           method.allowed_roles)
+                data = yield from dclass._parse_request(request)
 
-            data.set_session(session)
+                data.set_session(session)
 
-            ret = yield from method(data, request)
+                ret = yield from method(data, request)
 
-            resp = dclass._form_response(ret)
-            yield from dclass._postcheck_session(resp, session)
+                resp = dclass._form_response(ret)
+            except web.HTTPException as ex:
+                resp = ex
+            except Exception as ex:
+                resp = web.Response(text=traceback.format_exc(), status=500)
+            finally:
+                yield from dclass._postcheck_session(resp, session)
+
             return resp
+
 
         docs = '' if not method.__doc__ \
                   else method.__doc__.strip().split('\n')[0]

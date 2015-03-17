@@ -156,7 +156,7 @@ class ServiceMgmt:
         return str(self.__args)
 
     @asyncio.coroutine
-    def start(self, *args, env=None, input_s=None):
+    def start(self, *args, env=None, input_s=None, need_stdout=False):
         if env is None:
             env = {}
         self.__args = args
@@ -166,6 +166,10 @@ class ServiceMgmt:
             args = ['su', self.__username, '-s'] + list(args)
             stderr = asyncio.subprocess.PIPE
         else:
+            stderr = self.__out
+
+        if need_stdout:
+            self.__out = None
             stderr = self.__out
 
         self.__proc = yield from \
@@ -241,7 +245,8 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
         cor = s_mgmt.start(config.python_exec,
                            os.path.join(bin_dir, 'leela-worker'),
                            '{}-{}'.format(proj_name, i),
-                           env=env, input_s=params_str)
+                           env=env, input_s=params_str,
+                           need_stdout = not config.need_daemonize)
 
         loop.run_until_complete(cor)
         leela_processes.append(s_mgmt)

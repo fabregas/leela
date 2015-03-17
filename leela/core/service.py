@@ -6,6 +6,8 @@ from .sessions import User
 from .orm import Model
 from .orm import AbstractDatabase
 
+from leela.db_support.inmemory import InMemoryDatabase
+
 
 class AService(object):
     @classmethod
@@ -14,8 +16,12 @@ class AService(object):
         raise RuntimeError('Not implemented!')
 
     def __init__(self, database):
+        if database is None:
+            database = InMemoryDatabase()
+
         if not isinstance(database, AbstractDatabase):
             raise RuntimeError('Invalid database instance!')
+
         self.database = database
         self.db = database  # alias
         Model.init(database)
