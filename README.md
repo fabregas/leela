@@ -91,6 +91,13 @@ For example:
 
 You can perform GET request in your browser http://127.0.0.1:8080/api/str_len?string=testme and see '6' (length of string 'testme')
 
+For uploading files you can use following decorators:
+> reg\_postfile
+for receiving file from multipart POST request
+> reg\_uploadstream
+for receiving file as a raw binary stream (good choice for large files for better async process)
+
+
 ### Authentication
 
 You can request authentication (and authorization) for every API method. For example:
