@@ -20,3 +20,12 @@ Feature: Leela mgmt daemon
         And I see "cpu_count" leela worker binded on "unix" socket
         And get "/" with code "200"
         And contain "Available methods:" in "/api/__introspect__" body
+
+    Scenario: Activity test
+        Given I create leela project "test_proj_4"
+        When I start leela with "test-act" config as "user"
+        Then I see leela nodaemon
+        And I see "2" leela worker binded on "tcp" socket
+        And get "/" with code "200"
+        And contain "Available methods:" in "/api/__introspect__" body
+

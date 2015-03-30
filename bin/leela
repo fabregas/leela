@@ -10,9 +10,14 @@ from leela.utils import dispatcher_daemon
 from leela.utils.config import LeelaConfig
 
 INDEX_HTML = '''<html>
-  <body>
-    <h1>Hello, Leela</h1>
-  </body>
+    <head>
+        <script src="/static/js/angular.min.js"></script>
+        <script src="/static/js/leela.js"></script>
+    </head>
+
+    <body>
+        <h1>Hello, Leela</h1>
+    </body>
 </html>
 '''
 

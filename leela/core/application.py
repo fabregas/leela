@@ -10,12 +10,14 @@ from aiohttp import web
 
 from leela.core.core import reg_api
 from leela.core.service import AService
+from leela.core.activity import AActivity
 
 
 class Application(object):
     def __init__(self):
         self.__app = web.Application()
         self.__services = []
+        self.__activities = []
         self.__unixsocket = None
 
     def set_logger_config(self, logger_config_path):
@@ -27,16 +29,15 @@ class Application(object):
             raise RuntimeError('Invalid logger config file: {}'
                                .format(err))
 
-    @asyncio.coroutine
-    def init_service(self, service_name, config):
-        if service_name.endswith('.py'):
-            service_name = service_name.rstrip('.py')
+    def _init_module(self, module_name, base_class):
+        if module_name.endswith('.py'):
+            module_name = module_name[:-3]
 
         try:
-            service = importlib.import_module(service_name)
+            service = importlib.import_module(module_name)
         except ImportError:
-            raise RuntimeError('Service "{}" does not found!'.
-                               format(service_name))
+            raise RuntimeError('Module "{}" does not found!'.
+                               format(module_name))
 
         class_o = None
         for attr in dir(service):
@@ -45,25 +46,34 @@ class Application(object):
 
             class_o = getattr(service, attr)
             try:
-                if class_o != AService and issubclass(class_o, AService):
+                if class_o != base_class and issubclass(class_o, base_class):
                     break
             except TypeError:
                 continue
         else:
-            raise RuntimeError('No one service class found in "{}"'.
-                               format(service_name))
+            raise RuntimeError('No one {} class found in "{}"'.
+                               format(base_class, module_name))
 
-        print('-> found service class {}'.format(class_o))
-
-        yield from self.init_service_class(class_o, config)
+        print('-> found class {}'.format(class_o))
+        return class_o
 
     @asyncio.coroutine
-    def init_service_class(self, service_class, config):
+    def init_service(self, service_name, config):
+        service_class = self._init_module(service_name, AService)
+
         s_instance = yield from service_class.initialize(config)
 
         reg_api.setup_service(s_instance)
 
         self.__services.append(s_instance)
+
+    @asyncio.coroutine
+    def init_activity(self, module_name, config):
+        act_class = self._init_module(module_name, AActivity)
+
+        a_instance = yield from act_class.initialize(config)
+        asyncio.async(a_instance.start())
+        self.__activities.append(a_instance)
 
     def setup_sessions_manager(self, s_manager_obj_path):
         parts = s_manager_obj_path.split('.')
@@ -120,7 +130,11 @@ class Application(object):
         for service in self.__services:
             yield from service.destroy()
 
+        for activity in self.__activities:
+            yield from activity.destroy()
+
         self.__services = []
+        self.__activities = []
 
         if self.__unixsocket:
             os.unlink(self.__unixsocket)

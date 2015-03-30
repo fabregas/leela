@@ -1,0 +1,16 @@
+leela:
+    bind_address: 127.0.0.1:8080
+    monitor_changes: true
+    nginx_proxy: false
+    leela_proc_count: 1
+    logger_config: logger-test.yaml
+    daemonize: false
+    services:
+        - endpoint: service.py
+          config:
+            db_name: test_db
+    activities:
+        - endpoint: activity.py
+          config:
+              act_name: TestActivity
+

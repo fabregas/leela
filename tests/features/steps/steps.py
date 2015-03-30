@@ -11,6 +11,8 @@ from behave import *
 base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                            '../../../'))
 leela_bin = os.path.join(base_dir, 'bin/leela')
+test_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                '../data'))
 
 def call_leela(*args):
     s_args = ['python3', leela_bin]
@@ -40,6 +42,13 @@ def step_impl(context, proj_name):
         print(out.decode())
         print(err.decode())
         raise RuntimeError('leela new-project failed!')
+
+    ret = os.system('cp %s %s/'%(os.path.join(test_data_dir, 'test-act.yaml'),
+                          os.path.join(work_dir, 'config')))
+
+    os.system('mkdir %s/activities'%work_dir)
+    os.system('cp %s %s/activities'%(os.path.join(test_data_dir, 'activity.py'),
+                                     work_dir))
 
     context.work_dir = work_dir 
 

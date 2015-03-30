@@ -51,6 +51,20 @@ def main(name, project_home, logger_config_file, services,
     finally:
         pass
 
+def main_activity(name, project_home, logger_config_file,
+                  act_endpoint, act_config): 
+    sys.path.append(os.path.join(project_home, 'activities'))
+    if logger_config_file != '--noconf':
+        app.set_logger_config(logger_config_file)
+
+    logger.info('[{}] starting activity {}...'.format(name, act_endpoint))
+    future = app.init_activity(act_endpoint, act_config)
+    loop.run_until_complete(future)
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
 @asyncio.coroutine
 def stop(s='', n=''):
     global stopped
@@ -82,9 +96,14 @@ if __name__ == '__main__':
         name = sys.argv[1]
 
         args = json.loads(input())
-
-        main(name, args[0], args[1], args[2],
-             args[3], args[4], args[5], args[6])
+        mode = args.pop(0)
+        if mode == 'services':
+            main(name, args[0], args[1], args[2],
+                 args[3], args[4], args[5], args[6])
+        elif mode == 'activity':
+            main_activity(name, args[0], args[1], args[2], args[3])
+        else:
+            raise Exception('Unknown leela-worker mode!')
     except Exception as err:
         logger.error('[{}] global exception: {}'.format(name, err))
         import traceback

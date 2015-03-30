@@ -36,6 +36,14 @@ class LeelaConfig(object):
                              'srv_config': s_config.get('config', {}) })
         self.__config['services'] = services
 
+        activities_cfg = config.get('activities', [])
+        activities = []
+        for a_config in activities_cfg:
+            self.__check_param(a_config, 'endpoint')
+            activities.append({'act_endpoint': a_config['endpoint'],
+                               'act_config': a_config.get('config',{})})
+        self.__config['activities'] = activities
+
         self.__config['python_exec'] = config.get('python_exec',
                                                   sys.executable or 'python3')
 
