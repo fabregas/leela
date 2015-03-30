@@ -106,6 +106,7 @@ class reg_api(object):
     @classmethod
     def _decorate_method(cls, method):
         def handler(request):
+            session = None
             try:
                 dclass = method.decorator_class
                 session = yield from dclass._check_session(request,

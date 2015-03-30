@@ -61,6 +61,10 @@ class Application(object):
     def init_service(self, service_name, config):
         service_class = self._init_module(service_name, AService)
 
+        yield from self.init_service_class(service_class, config)
+
+    @asyncio.coroutine
+    def init_service_class(self, service_class, config):
         s_instance = yield from service_class.initialize(config)
 
         reg_api.setup_service(s_instance)

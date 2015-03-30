@@ -4,7 +4,7 @@ import os
 import sys
 
 path = os.path.dirname(os.path.abspath(__file__))
-sys.path.append('.')
+sys.path.append(os.path.abspath('.'))
 
 for item in os.listdir(path):
     if not item.endswith('.py'):

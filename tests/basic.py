@@ -3,7 +3,11 @@ import aiohttp
 import asyncio
 import unittest
 import json
+import sys
+import os
 from datetime import datetime
+
+sys.path.append(os.path.abspath('.'))
 
 from leela.core import *
 from leela.db_support.inmemory import InMemoryDatabase 

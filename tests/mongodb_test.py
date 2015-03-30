@@ -3,6 +3,11 @@ import aiohttp
 import asyncio
 import unittest
 import json
+import os
+import sys
+
+path = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.abspath('.'))
 
 from leela.core import *
 from leela.db_support.mongo import MongoDB, MongoQueryResult
