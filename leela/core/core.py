@@ -232,9 +232,10 @@ class reg_uploadstream(reg_post):
     @classmethod
     @asyncio.coroutine
     def _parse_request(cls, request):
-        data = request.content
         ret = UserData()
-        ret['stream'] = data
+        for key in iter(request.GET):
+            ret[key] = request.GET.get(key)
+        ret['stream'] = request.content
         return ret
 
     @classmethod

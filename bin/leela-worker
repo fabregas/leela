@@ -40,6 +40,8 @@ def main(name, project_home, logger_config_file, services,
             parts = bind_addr.split(':')
             parts.append(80)
             host, port = parts[:2]
+            if port.startswith('$'):
+                port = os.environ.get(port[1:], 80)
             app.make_tcp_server(host, port)
 
         logger.info('[{}] service started'.format(name))
@@ -105,8 +107,5 @@ if __name__ == '__main__':
         else:
             raise Exception('Unknown leela-worker mode!')
     except Exception as err:
-        logger.error('[{}] global exception: {}'.format(name, err))
-        import traceback
-        logger.write = logger.info
-        traceback.print_exc(file=logger)
+        logger.error('[{}] global exception: {}'.format(name, err), exc_info=1)
         sys.exit(3)

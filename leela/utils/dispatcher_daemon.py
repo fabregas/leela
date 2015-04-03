@@ -10,6 +10,7 @@ import logging.config
 import multiprocessing
 import asyncio.subprocess
 import tempfile
+import copy
 
 import leela
 from .logger import logger
@@ -219,9 +220,10 @@ class ServiceMgmt:
 def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
     leela_processes = []
     bind_sockets = []
-    env = {'PYTHONPATH':
-            os.path.abspath(os.path.dirname(leela.__file__)).rstrip('leela')
-            }
+    env = copy.copy(os.environ)
+    env['PYTHONPATH']= os.path.abspath(os.path.dirname(leela.__file__))\
+        .rstrip('leela')
+            
 
     for i in range(config.leela_proc_count):
         s_mgmt = ServiceMgmt(config.username)
