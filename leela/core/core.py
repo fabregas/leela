@@ -179,6 +179,19 @@ class reg_post(reg_api):
             ret[key] = data.get(key)
         return ret
 
+class reg_form_post(reg_api):
+    method = 'POST'
+
+    @classmethod
+    @asyncio.coroutine
+    def _parse_request(cls, request):
+        data = yield from request.post()
+
+        ret = UserData()
+        for key in iter(data):
+            ret[key] = data.get(key)
+        return ret
+
 
 class reg_get(reg_api):
     method = 'GET'

@@ -74,6 +74,8 @@ class AService(object):
         return web.Response()
 
     @reg_post('__logout__')
-    def util_terminate(self, data, http_req):
-        data.session.need_remove = True
+    def util_logout(self, data, http_req):
+        data.session.user = None
+        if data.get('clear_session', True):
+            data.session.need_remove = True
         return web.Response()
