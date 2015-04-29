@@ -218,13 +218,12 @@ class reg_websocket(reg_get):
     @classmethod
     @asyncio.coroutine
     def _parse_request(cls, request):
-        ret = super()._parse_request(request)
+        ret = yield from super()._parse_request(request)
         ws = web.WebSocketResponse()
         ok, protocol = ws.can_start(request)
         if not ok:
             raise web.HTTPExpectationFailed(reason='Invalid WebSocket')
         ws.start(request)
-
         ret.websocket = ws
         return ret
 
