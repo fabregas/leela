@@ -240,6 +240,7 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
         bind_sockets.append(lp_bind_addr)
 
         params_str = json.dumps(['services', home_path,
+                                 config.http,
                                  config.logger_config_path,
                                  config.services,
                                  config.sessions_manager, lp_is_ssl,

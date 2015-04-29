@@ -13,7 +13,7 @@ from leela.core.application import Application
 from leela.utils.logger import logger
 
 
-def main(name, project_home, logger_config_file, services,
+def main(name, project_home, http_conf, logger_config_file, services,
          sessions_mgr_path, is_ssl, bind_addr, is_unixsocket):
 
     sys.path.append(os.path.join(project_home, 'services'))
@@ -22,6 +22,8 @@ def main(name, project_home, logger_config_file, services,
         app.set_logger_config(logger_config_file)
 
     logger.info('[{}] starting service...'.format(name))
+
+    app.set_http_config(http_conf)
     try:
         for service in services:
             future = app.init_service(service['srv_endpoint'],
@@ -44,7 +46,7 @@ def main(name, project_home, logger_config_file, services,
                 port = os.environ.get(port[1:], 80)
             app.make_tcp_server(host, port)
 
-        logger.info('[{}] service started'.format(name))
+        logger.info('[{}] service started at {}'.format(name, bind_addr))
 
         try:
             loop.run_forever()
@@ -101,7 +103,7 @@ if __name__ == '__main__':
         mode = args.pop(0)
         if mode == 'services':
             main(name, args[0], args[1], args[2],
-                 args[3], args[4], args[5], args[6])
+                 args[3], args[4], args[5], args[6], args[7])
         elif mode == 'activity':
             main_activity(name, args[0], args[1], args[2], args[3])
         else:

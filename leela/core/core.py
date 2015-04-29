@@ -2,11 +2,12 @@
 import json
 import inspect
 import asyncio
+import aiohttp
 import traceback
 from aiohttp import web
 from .sessions import InMemorySessionsManager
 
-from leela.utils import logger
+from leela.utils.logger import logger
 
 COOKIE_SESSION_ID = 'session_id'
 
@@ -38,6 +39,7 @@ class reg_api(object):
     __routes = []
     __routes_map = {}
     __sessions_manager = InMemorySessionsManager()
+    __default_headers = aiohttp.MultiDict({})
 
     def __init__(self, path, auth=None):
         self.path = path
@@ -52,9 +54,12 @@ class reg_api(object):
     @classmethod
     def _form_response(cls, ret_object):
         if isinstance(ret_object, web.Response):
+            ret_object.headers.update(cls.__default_headers)
             return ret_object
+
         return web.Response(body=json.dumps(ret_object).encode(),
-                            content_type='application/json')
+                            content_type='application/json',
+                            headers=cls.__default_headers)
 
     @classmethod
     @asyncio.coroutine
@@ -133,6 +138,9 @@ class reg_api(object):
                   else method.__doc__.strip().split('\n')[0]
         cls.__routes.append((method.method, method.path, handler, docs))
 
+    @classmethod
+    def set_default_headers(cls, headers):
+        cls.__default_headers = aiohttp.MultiDict(headers)
 
     @classmethod
     def get_routes(cls):
@@ -224,6 +232,7 @@ class reg_websocket(reg_get):
     def _form_response(cls, ret_object):
         if not isinstance(ret_object, web.WebSocketResponse):
             raise RuntimeError('Expected WebSocketResponse object as a result')
+        ret_object.headers.update(cls.__default_headers)
         return ret_object
 
 class reg_postfile(reg_post):
@@ -239,7 +248,7 @@ class reg_postfile(reg_post):
 
     @classmethod
     def _form_response(cls, ret_object):
-        return web.Response()
+        return web.Response(headers = cls.__default_headers)
 
 class reg_uploadstream(reg_post):
     @classmethod
@@ -253,4 +262,4 @@ class reg_uploadstream(reg_post):
 
     @classmethod
     def _form_response(cls, ret_object):
-        return web.Response()
+        return web.Response(headers = cls.__default_headers)

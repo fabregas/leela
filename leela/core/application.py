@@ -20,6 +20,9 @@ class Application(object):
         self.__activities = []
         self.__unixsocket = None
 
+    def set_http_config(self, htt_config):
+        reg_api.set_default_headers(htt_config.get('headers', {}))
+
     def set_logger_config(self, logger_config_path):
         try:
             config = yaml.load(open(logger_config_path))

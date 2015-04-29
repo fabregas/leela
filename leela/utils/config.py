@@ -11,7 +11,9 @@ class LeelaConfig(object):
     def parse(self, config):
         self.__check_param(config, 'leela')
 
+        self.__config['http'] = config.get('http', {})
         config = config['leela']
+
         self.__check_param(config, 'bind_address')
         self.__check_param(config, 'services')
 
@@ -68,6 +70,7 @@ class LeelaConfig(object):
                                                     'config',
                                                     ssl_config['key'])
             self.__config['ssl_only'] = ssl_config.get('ssl_only', False)
+
 
     def __check_param(self, config, param):
         if type(config) != dict or param not in config:

@@ -7,6 +7,7 @@ Feature: Leela mgmt daemon
         And I see "1" leela worker binded on "tcp" socket
         And get "/" with code "200"
         And contain "Available methods:" in "/api/__introspect__" body
+        And not contain header "Access-Control-Allow-Origin" in "/api/__introspect__"
 
     Scenario: Default production config noroot
         Given I create leela project "test_proj_2"
@@ -20,6 +21,7 @@ Feature: Leela mgmt daemon
         And I see "cpu_count" leela worker binded on "unix" socket
         And get "/" with code "200"
         And contain "Available methods:" in "/api/__introspect__" body
+        And contain header "Access-Control-Allow-Origin" in "/api/__introspect__"
 
     Scenario: Activity test
         Given I create leela project "test_proj_4"

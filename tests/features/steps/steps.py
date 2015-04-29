@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 
 import os
 import sys
@@ -115,4 +116,30 @@ def step_impl(context, text, path):
     r = conn.getresponse()
     data = r.read().decode()
     assert (text in data) == True, data
+    conn.close()
+
+@then(u'contain header "{header}" in "{path}"')
+def step_impl(context, header, path):
+    conn = httplib.HTTPConnection("127.0.0.1:8080")
+    conn.request("GET", path)
+    r = conn.getresponse()
+    for cheader, value in r.getheaders():
+        if header.lower() == cheader.lower():
+            break
+    else:
+        raise Exception('header "%s" does not found! Received headers: %s'%
+                (header, str(r.getheaders())))
+    conn.close()
+
+
+@then(u'not contain header "{header}" in "{path}"')
+def step_impl(context, header, path):
+    conn = httplib.HTTPConnection("127.0.0.1:8080")
+    conn.request("GET", path)
+    r = conn.getresponse()
+    for cheader, value in r.getheaders():
+        if header.lower() == cheader.lower():
+            raise Exception('header "%s" not expected!! Received headers: %s'%
+                (header, str(r.getheaders())))
+
     conn.close()

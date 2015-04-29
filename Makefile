@@ -15,5 +15,5 @@ test:
 	@$(TEST_RUNNER)
 
 behave:
-	behave tests/features/
+	/usr/lib/python-exec/python3.4/behave tests/features/
 

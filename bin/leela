@@ -47,6 +47,12 @@ PRODUCTION_YAML = '''leela:
              db_name: {}_prod_db
     sessions_manager:
         endpoint: leela.db_support.mongo.MongoSessionsManager
+
+http:
+    headers:
+        Access-Control-Allow-Origin: '*'
+        Access-Control-Allow-Credentials: 'true'
+        Access-Control-Allow-Methods: 'GET, POST'
 '''
 
 SERVICE_PY = '''#!/usr/bin/python
