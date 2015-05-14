@@ -226,7 +226,8 @@ class TestBasicAPI(unittest.TestCase):
         files = {'file': open(__file__, 'rb')}
         r = yield from aiohttp.request('post', 'http://0.0.0.0:6666/api/some_file', 
                                         data=files) 
-        self.assertEqual(r.status, 200)
+        data = yield from r.read()
+        self.assertEqual(r.status, 200, data)
 
         self.assertEqual(B.FNAME, 'basic.py')
         self.assertEqual(B.FCONT, open(__file__, 'rb').read())

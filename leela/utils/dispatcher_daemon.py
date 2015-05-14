@@ -230,7 +230,8 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
         is_unixsocket = config.is_nginx_proxy
         lp_is_ssl = config.ssl and not is_unixsocket
         if not config.is_nginx_proxy:
-            lp_bind_addr = config.bind_address
+            lp_bind_addr = '{}:{}'.format(config.bind_address,
+                                          config.bind_port)
         else:
             tmpdir = tempfile.gettempdir()
             tmp_file = os.path.join(tmpdir,
@@ -276,15 +277,10 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
 def _run_nginx(loop, home_path, proj_name, config,
                leela_processes,  bind_sockets):
     if config.is_nginx_proxy:
-        parts = config.bind_address.split(':')
-        if len(parts) == 2:
-            port = parts[1]
-        else:
-            port = 80
         static_path = os.path.abspath(os.path.join(home_path, 'www'))
 
         cnf_file = _make_nginx_config(config.username, proj_name,
-                                      bind_sockets, port,
+                                      bind_sockets, config.bind_port,
                                       static_path, config.ssl_cert,
                                       config.ssl_key,
                                       config.ssl_only)

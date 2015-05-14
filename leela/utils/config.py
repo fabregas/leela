@@ -18,6 +18,7 @@ class LeelaConfig(object):
         self.__check_param(config, 'services')
 
         self.__config['bind_address'] = config['bind_address']
+        self.__config['bind_port'] = config.get('bind_port', 80)
         self.__config['monitor_changes'] = config.get('monitor_changes', False)
         self.__config['leela_proc_count'] = config.get('leela_proc_count', -1)
         def_proxy = self.__config['leela_proc_count'] != 1

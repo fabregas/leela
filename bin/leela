@@ -22,7 +22,8 @@ INDEX_HTML = '''<html>
 '''
 
 TEST_YAML = '''leela:
-    bind_address: 127.0.0.1:8080
+    bind_address: 127.0.0.1
+    bind_port: 8080
     monitor_changes: true
     nginx_proxy: false
     leela_proc_count: 1
@@ -35,7 +36,8 @@ TEST_YAML = '''leela:
 '''
 
 PRODUCTION_YAML = '''leela:
-    bind_address: 0.0.0.0:8080
+    bind_address: 0.0.0.0
+    bind_port: 8080
     monitor_changes: true
     leela_proc_count: -1
     logger_config: logger-production.yaml

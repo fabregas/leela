@@ -39,7 +39,7 @@ class reg_api(object):
     __routes = []
     __routes_map = {}
     __sessions_manager = InMemorySessionsManager()
-    __default_headers = aiohttp.MultiDict({})
+    _default_headers = aiohttp.MultiDict({})
 
     def __init__(self, path, auth=None):
         self.path = path
@@ -54,12 +54,12 @@ class reg_api(object):
     @classmethod
     def _form_response(cls, ret_object):
         if isinstance(ret_object, web.Response):
-            ret_object.headers.update(cls.__default_headers)
+            ret_object.headers.update(cls._default_headers)
             return ret_object
 
         return web.Response(body=json.dumps(ret_object).encode(),
                             content_type='application/json',
-                            headers=cls.__default_headers)
+                            headers=cls._default_headers)
 
     @classmethod
     @asyncio.coroutine
@@ -140,7 +140,7 @@ class reg_api(object):
 
     @classmethod
     def set_default_headers(cls, headers):
-        cls.__default_headers = aiohttp.MultiDict(headers)
+        cls._default_headers = aiohttp.MultiDict(headers)
 
     @classmethod
     def get_routes(cls):
@@ -231,23 +231,13 @@ class reg_websocket(reg_get):
     def _form_response(cls, ret_object):
         if not isinstance(ret_object, web.WebSocketResponse):
             raise RuntimeError('Expected WebSocketResponse object as a result')
-        ret_object.headers.update(cls.__default_headers)
+        ret_object.headers.update(cls._default_headers)
         return ret_object
 
-class reg_postfile(reg_post):
-    @classmethod
-    @asyncio.coroutine
-    def _parse_request(cls, request):
-        data = yield from request.post()
-
-        ret = UserData()
-        for key in iter(data):
-            ret[key] = data.get(key)
-        return ret
-
+class reg_postfile(reg_form_post):
     @classmethod
     def _form_response(cls, ret_object):
-        return web.Response(headers = cls.__default_headers)
+        return web.Response(headers = cls._default_headers)
 
 class reg_uploadstream(reg_post):
     @classmethod
@@ -261,4 +251,4 @@ class reg_uploadstream(reg_post):
 
     @classmethod
     def _form_response(cls, ret_object):
-        return web.Response(headers = cls.__default_headers)
+        return web.Response(headers = cls._default_headers)
