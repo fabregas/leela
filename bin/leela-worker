@@ -85,7 +85,6 @@ def stop(s='', n=''):
     except Exception as err:
         logger.error('[{}] destroy routine failed: {}'.format(name, err))
     logger.info('[{}] finished'.format(name))
-    loop.close()
 
 
 if __name__ == '__main__':

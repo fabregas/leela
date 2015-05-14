@@ -13,5 +13,6 @@ leela:
         - endpoint: activity.py
           config:
               act_name: TestActivity
+              user: $USER || unknown
 
 

@@ -6,6 +6,7 @@ import http.client as httplib
 import tempfile
 import time
 import multiprocessing
+import copy
 from subprocess import Popen, PIPE
 from behave import *
 
@@ -17,8 +18,10 @@ test_data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
 
 def call_leela(*args):
     s_args = ['python3', leela_bin]
+    env = copy.copy(os.environ)
+    env['PYTHONPATH'] = base_dir
     proc = Popen(s_args + list(args), stdout=PIPE, stderr=PIPE,
-                  env={'PYTHONPATH': base_dir})
+                  env=env)
     return proc
 
 def sudo_call_leela(*args):
