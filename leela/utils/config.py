@@ -98,9 +98,13 @@ class LeelaConfig(object):
 
     def __check_type(self, param, val, rtype):
         if type(val) != rtype:
-            raise ValueError('<{}> value should be an instance of "{}" '
+            try:
+                val = rtype(val)
+            except ValueError as err:
+                raise ValueError('<{}> value should be an instance of "{}" '
                              '(but "{}" found)'
                              .format(param, rtype.__name__, val))
+        return val
 
     def __gv(self, config, param, default=None, ret_type=None):
         '''get value of config param
@@ -141,7 +145,7 @@ class LeelaConfig(object):
             val = val.replace('\\|\\|', '||').replace('\$', '$')
 
         if ret_type:
-            self.__check_type(param, val, ret_type)
+            val = self.__check_type(param, val, ret_type)
 
         return val
 

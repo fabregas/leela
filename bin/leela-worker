@@ -42,8 +42,6 @@ def main(name, project_home, http_conf, logger_config_file, services,
             parts = bind_addr.split(':')
             parts.append(80)
             host, port = parts[:2]
-            if port.startswith('$'):
-                port = os.environ.get(port[1:], 80)
             app.make_tcp_server(host, port)
             bind_addr = '{}://{}:{}'.format('https' if is_ssl else 'http',
                                             host, port)
