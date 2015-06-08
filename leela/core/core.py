@@ -1,5 +1,6 @@
 
 import json
+import re
 import inspect
 import asyncio
 import aiohttp
@@ -10,6 +11,38 @@ from .sessions import InMemorySessionsManager
 from leela.utils.logger import logger
 
 COOKIE_SESSION_ID = 'session_id'
+
+
+class CORS(object):
+    def __init__(self, rule):
+        if 'url_regex' not in rule:
+            raise RuntimeError('url_regex is expected for CORS config')
+
+        self.url_regex = re.compile(rule['url_regex'])
+        self.allow_origin = rule.get('allow_origin', [])
+        self.allow_credentials = rule.get('allow_credentials', False)
+        self.allow_methods = rule.get('allow_methods',
+                                      ['GET', 'POST', 'PUT', 'PATCH',
+                                       'DELETE', 'OPTIONS'])
+        self.allow_headers = rule.get('allow_headers',
+                                      ['x-requested-with', 'content-type',
+                                       'accept', 'origin', 'authorization',
+                                       'x-csrftoken'])
+
+    def check(self, request):
+        if request.method not in self.allow_methods:
+            raise web.HTTPMethodNotAllowed(request.method, self.allow_methods,
+                                           headers=self.http_headers())
+
+    def matched(self, url):
+        return bool(self.url_regex.match(url))
+
+    def http_headers(self):
+        return {'Access-Control-Allow-Origin':  ' '.join(self.allow_origin),
+                'Access-Control-Allow-Credentials':
+                                        str(self.allow_credentials).lower(),
+                'Access-Control-Allow-Methods': ', '.join(self.allow_methods),
+                'Access-Control-Allow-Headers': ', '.join(self.allow_headers)}
 
 
 class UserData(dict):
@@ -37,14 +70,38 @@ need_auth = authorization()
 class reg_api(object):
     method = None
     __routes = []
+    __cors_rules = []
     __routes_map = {}
     __sessions_manager = InMemorySessionsManager()
     _default_headers = aiohttp.MultiDict({})
+    __headers = {}
 
     def __init__(self, path, auth=None):
+        '''
+        path - object path
+        auth - instance of @authorization class or None
+        '''
         self.path = path
         self.need_auth = bool(auth)
         self.allowed_roles = set() if not auth else auth.allowed_roles()
+
+
+    @classmethod
+    def __get_headers(cls, path):
+        if path in cls.__headers:
+            return cls.__headers[path]
+
+        f_rule = None
+        for cors_rule in cls.__cors_rules:
+            if cors_rule.matched(path):
+                f_rule = cors_rule
+
+        resp_headers = cls._default_headers
+        if f_rule is not None:
+            resp_headers.update(f_rule.http_headers())
+        cls.__headers[path] = (resp_headers, f_rule)
+        return cls.__headers[path]
+
 
     @classmethod
     @asyncio.coroutine
@@ -52,14 +109,14 @@ class reg_api(object):
         return UserData()
 
     @classmethod
-    def _form_response(cls, ret_object):
+    def _form_response(cls, ret_object, headers={}):
         if isinstance(ret_object, web.Response):
-            ret_object.headers.update(cls._default_headers)
+            ret_object.headers.update(headers)
             return ret_object
 
         return web.Response(body=json.dumps(ret_object).encode(),
                             content_type='application/json',
-                            headers=cls._default_headers)
+                            headers=headers)
 
     @classmethod
     @asyncio.coroutine
@@ -105,7 +162,7 @@ class reg_api(object):
         func.allowed_roles = self.allowed_roles
         func.is_leela_api = True 
         func.decorator_class = self.__class__
-
+        
         return asyncio.coroutine(func)
 
     @classmethod
@@ -119,11 +176,15 @@ class reg_api(object):
                                                            method.allowed_roles)
                 data = yield from dclass._parse_request(request)
 
+                headers, cors_rule = dclass.__get_headers(request.path)
+                if cors_rule:
+                    cors_rule.check(request)
+
                 data.set_session(session)
 
                 ret = yield from method(data, request)
 
-                resp = dclass._form_response(ret)
+                resp = dclass._form_response(ret, headers)
             except web.HTTPException as ex:
                 resp = ex
             except Exception as ex:
@@ -141,6 +202,10 @@ class reg_api(object):
     @classmethod
     def set_default_headers(cls, headers):
         cls._default_headers = aiohttp.MultiDict(headers)
+
+    @classmethod
+    def set_cors_rules(cls, cors_rules):
+        cls.__cors_rules = cors_rules
 
     @classmethod
     def get_routes(cls):
@@ -228,16 +293,16 @@ class reg_websocket(reg_get):
         return ret
 
     @classmethod
-    def _form_response(cls, ret_object):
+    def _form_response(cls, ret_object, headers):
         if not isinstance(ret_object, web.WebSocketResponse):
             raise RuntimeError('Expected WebSocketResponse object as a result')
-        ret_object.headers.update(cls._default_headers)
+        ret_object.headers.update(headers)
         return ret_object
 
 class reg_postfile(reg_form_post):
     @classmethod
-    def _form_response(cls, ret_object):
-        return web.Response(headers = cls._default_headers)
+    def _form_response(cls, ret_object, headers):
+        return web.Response(headers = headers)
 
 class reg_uploadstream(reg_post):
     @classmethod
@@ -250,5 +315,5 @@ class reg_uploadstream(reg_post):
         return ret
 
     @classmethod
-    def _form_response(cls, ret_object):
-        return web.Response(headers = cls._default_headers)
+    def _form_response(cls, ret_object, headers):
+        return web.Response(headers = headers)

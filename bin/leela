@@ -50,11 +50,18 @@ PRODUCTION_YAML = '''leela:
     sessions_manager:
         endpoint: leela.db_support.mongo.MongoSessionsManager
 
-http:
-    headers:
-        Access-Control-Allow-Origin: '*'
-        Access-Control-Allow-Credentials: 'true'
-        Access-Control-Allow-Methods: 'GET, POST'
+CORS:
+    - url_regex: '^.*$'
+      allow_origin: []
+      allow_credentials: false #true
+      allow_methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      allow_headers: ['x-requested-with', 'content-type', 'accept',
+                      'origin', 'authorization', 'x-csrftoken']
+ 
+    - url_regex: '^/api/.*$'
+      allow_origin: ['*']
+      allow_credentials: true
+      
 '''
 
 SERVICE_PY = '''#!/usr/bin/python

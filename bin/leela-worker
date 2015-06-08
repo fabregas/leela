@@ -13,7 +13,7 @@ from leela.core.application import Application
 from leela.utils.logger import logger
 
 
-def main(name, project_home, http_conf, logger_config_file, services,
+def main(name, project_home, conf, logger_config_file, services,
          sessions_mgr_path, is_ssl, bind_addr, is_unixsocket):
 
     sys.path.append(os.path.join(project_home, 'services'))
@@ -23,7 +23,8 @@ def main(name, project_home, http_conf, logger_config_file, services,
 
     logger.info('[{}] starting service...'.format(name))
 
-    app.set_http_config(http_conf)
+    app.set_http_config(conf.get('http', {}))
+    app.set_cors_config(conf.get('CORS', {}))
     try:
         for service in services:
             future = app.init_service(service['srv_endpoint'],

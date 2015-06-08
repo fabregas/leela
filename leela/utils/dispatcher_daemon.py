@@ -56,8 +56,11 @@ NGINX_NOSSL_CONFIG = '''
         access_log /dev/null;
         error_log /tmp/error_log;
 
-        location ^~ /  {
+        location  /  {
             root %(static_path)s;
+        }
+        location /static  {
+            alias %(static_path)s;
         }
 
         location /api {
@@ -83,8 +86,11 @@ NGINX_SSL_CONFIG = '''
         access_log /dev/null;
         error_log /tmp/error_log;
 
-        location ^~ /  {
+        location  /  {
             root %(static_path)s;
+        }
+        location /static  {
+            alias %(static_path)s;
         }
 
         location /api {
@@ -241,7 +247,7 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
         bind_sockets.append(lp_bind_addr)
 
         params_str = json.dumps(['services', home_path,
-                                 config.http,
+                                 {'CORS': config.CORS},
                                  config.logger_config_path,
                                  config.services,
                                  config.sessions_manager, lp_is_ssl,

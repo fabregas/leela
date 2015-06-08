@@ -12,7 +12,7 @@ class LeelaConfig(object):
     def parse(self, config):
         self.__check_param(config, 'leela')
 
-        self.__config['http'] = config.get('http', {})
+        self.__config['CORS'] = config.get('CORS', {})
         config = config['leela']
 
         self.__check_param(config, 'bind_address')

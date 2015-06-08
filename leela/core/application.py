@@ -8,7 +8,7 @@ import importlib
 import asyncio
 from aiohttp import web
 
-from leela.core.core import reg_api
+from leela.core.core import reg_api, CORS
 from leela.core.service import AService
 from leela.core.activity import AActivity
 
@@ -22,6 +22,22 @@ class Application(object):
 
     def set_http_config(self, htt_config):
         reg_api.set_default_headers(htt_config.get('headers', {}))
+
+    def set_cors_config(self, cors_config):
+        '''
+        - url_regex: '^.*$'
+          allow_origin: []
+          allow_credentials: false #true
+          allow_methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+          allow_headers: ['x-requested-with', 'content-type', 'accept',
+                          'origin', 'authorization', 'x-csrftoken']
+        ...
+        '''
+        cors_list = []
+        for rule in cors_config:
+            cors_list.append(CORS(rule))
+
+        reg_api.set_cors_rules(cors_list)
 
     def set_logger_config(self, logger_config_path):
         try:
