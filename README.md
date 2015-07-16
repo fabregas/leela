@@ -5,6 +5,18 @@ Leela
 #### We are using `asyncio` library for building extreme scalable web applications with extreme concurrency
 
 
+**Table of Contents**
+
+- [Leela](#)
+        - [Installation](#)
+        - [Leela managament tool](#)
+        - [Leela configuration](#)
+            - [Configuration file format](#)
+        - [Development](#)
+            - [Service methods](#)
+            - [Authentication](#)
+
+
 Installation
 ============
 
@@ -62,7 +74,7 @@ Ok.. now you can implement your service using python3 and create veiw layer in H
 Leela configuration
 ===================
 
-You should specify your configuration files in `project path`/config directory. By default,
+You should specify your configuration files in `project_path/config` directory. By default,
 leela has test.yaml and production.yaml configuration files.
 
 
@@ -71,46 +83,47 @@ Configuration file format
 
     leela:
         bind_address: <bind IP address>
-        *bind_port: <bind port (80 by default)>*
-        *monitor_changes: <true|false (false by default)>*
-        *leela_proc_count: <leela workers count (-1 = cpu_count by default)*
-        *logger_config: <logger config file name (logger.yaml by default)>*
-        *need_daemonize: <true|false (true by default)>*
-        *user: <owner of the application (leela by default)>*
-        *static_path: <path to static files (project_path/www by default)>*
-        *nginx_proxy: <true|false (false by default)>*
-        *nginx_exec: <path to nginx exec (/usr/sbin/nginx by default)*
-        *python_exec: <path to Python exec (python3 by default)*
+        *bind_port: <bind port (80 by default)>
+        *monitor_changes: <true|false (false by default)>
+        *leela_proc_count: <leela workers count (-1 = cpu_count by default)
+        *logger_config: <logger config file name (logger.yaml by default)>
+        *need_daemonize: <true|false (true by default)>
+        *user: <owner of the application (leela by default)>
+        *static_path: <path to static files (project_path/www by default)>
+        *nginx_proxy: <true|false (false by default)>
+        *nginx_exec: <path to nginx exec (/usr/sbin/nginx by default)
+        *python_exec: <path to Python exec (python3 by default)
 
-        *ssl:*
-            ssl_cert: <path to SSL certificate>
-            ssl_key: <path to SSL key>
-            ssl_only: <true|false (false by default)> 
+        *ssl:
+            *ssl_cert: <path to SSL certificate>
+            *ssl_key: <path to SSL key>
+            *ssl_only: <true|false (false by default)> 
 
         services:
             - endpoint: <service endpoint - python module path>
-              *config: <configuration dictionary ({} by default)*
+              *config: <configuration dictionary ({} by default)
             ...
 
-        *activities:*
+        *activities:
             - endpoint: <activity endpoint - python module path>
-              *config: <configuration dictionary ({} by default)*
+              *config: <configuration dictionary ({} by default)
             ...
             
 
         *sessions_manager:*
-            *endpoint: <sessions manager endpoint - python module path>*
+            endpoint: <sessions manager endpoint - python module path>
 
 
-    *CORS:*
-        - url_regex: <URL regexp for CORS apply>
-          allow_origin: <list of allowed origin ([] by default)>
-          allow_credentials: <true|false (false by default)>
-          allow_methods: <list of allowed HTTP methods ([GET, POST, PUT, PATCH, DELETE, OPTIONS] by default)>
-          allow_headers: <list of allowed HTTP headers (['x-requested-with', 'content-type', 'accept',
+    *CORS:
+        - *url_regex: <URL regexp for CORS apply>
+          *allow_origin: <list of allowed origin ([] by default)>
+          *allow_credentials: <true|false (false by default)>
+          *allow_methods: <list of allowed HTTP methods ([GET, POST, PUT, PATCH, DELETE, OPTIONS] by default)>
+          *allow_headers: <list of allowed HTTP headers (['x-requested-with', 'content-type', 'accept',
                                                         'origin', 'authorization', 'x-csrftoken'] by default)>
         ...
 
+Parameters markes as '\*' are optional.
 
 
 Values of parameters in *leela* section of configuration file can be environment variables.
@@ -122,6 +135,10 @@ For example:
     test3: null || helloo
     test4: 'my simple string value with "\|\|"'
     test5: '\$just string with "$" symbol'
+
+
+
+
 
 
 
