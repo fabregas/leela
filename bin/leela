@@ -33,6 +33,8 @@ TEST_YAML = '''leela:
         - endpoint: service.py
           config:
              db_name: {}_test_db
+    sessions_manager:
+        endpoint: leela.core.sessions.InMemorySessionsManager
 '''
 
 PRODUCTION_YAML = '''leela:
