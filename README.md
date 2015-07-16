@@ -5,7 +5,7 @@ Leela
 #### We are using `asyncio` library for building extreme scalable web applications with extreme concurrency
 
 
-**Table of Contents**
+
 
   * [Installation](#installation)
   * [Leela managament tool](#leela-managament-tool)
