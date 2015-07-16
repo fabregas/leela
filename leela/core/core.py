@@ -194,10 +194,23 @@ class reg_api(object):
 
             return resp
 
+        def option_handler(request):
+            dclass = method.decorator_class
+            headers, cors_rule = dclass.__get_headers(request.path)
+            if cors_rule:
+                cors_rule.check(request)
+                headers['Allow'] = ','.join(cors_rule.allow_methods)
+            else:
+                headers['Allow'] = 'HEAD,GET,PUT,POST,PATCH,DELETE,OPTIONS'
+
+            return web.Response(headers=headers)
+
 
         docs = '' if not method.__doc__ \
                   else method.__doc__.strip().split('\n')[0]
-        cls.__routes.append((method.method, method.path, handler, docs))
+        cls.__routes.append((method.method, method.path, handler, docs,
+                             option_handler))
+
 
     @classmethod
     def set_default_headers(cls, headers):

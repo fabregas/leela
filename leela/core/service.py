@@ -40,7 +40,7 @@ class AService(object):
     @reg_get('__introspect__')
     def util_introspect_methods(self, data, http_req):
         li_list = ''
-        for method, path, _, docs in reg_api.get_routes():
+        for method, path, _, docs, _ in reg_api.get_routes():
             if path.startswith('/api/__'):
                 continue
 

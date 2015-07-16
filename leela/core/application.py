@@ -117,8 +117,9 @@ class Application(object):
         return sessions_manager
 
     def __make_router(self):
-        for method, path, handle, _ in reg_api.get_routes():
+        for method, path, handle, _, opt_handler in reg_api.get_routes():
             self.__app.router.add_route(method, path, handle)
+            self.__app.router.add_route('OPTIONS', path, opt_handler)
 
     def handle_static(self, static_path):
         self.__app.router.add_static('/static', static_path)
@@ -131,7 +132,12 @@ class Application(object):
             data = open(idx_path).read()
             return web.Response(body=data.encode())
 
+        @asyncio.coroutine
+        def root_opt_handler(request):
+            return web.Response(headers={'Allow': 'GET'})
+
         self.__app.router.add_route('GET', '/', root_handler)
+        self.__app.router.add_route('OPTIONS', '/', root_opt_handler)
 
     def make_tcp_server(self, host, port):
         self.__make_router()
