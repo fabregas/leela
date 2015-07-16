@@ -7,13 +7,13 @@ Leela
 
 **Table of Contents**
 
-  * [Installation](#)
-  * [Leela managament tool](#)
-  * [Leela configuration](#)
-    * [Configuration file format](#)
-  * [Development](#)
-    * [Service methods](#)
-    * [Authentication](#)
+  * [Installation](#installation)
+  * [Leela managament tool](#leela-managament-tool)
+  * [Leela configuration](#leela-configuration)
+    * [Configuration file format](#configuration-file-format)
+  * [Development](#development)
+    * [Service methods](#service-methods)
+    * [Authentication](#authentication)
 
 
 Installation
