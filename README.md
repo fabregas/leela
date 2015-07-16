@@ -6,7 +6,7 @@ Leela
 
 
 Installation
-------------
+============
 
 You can install `leela` package using pip3:
 
@@ -18,8 +18,20 @@ Dependencies:
     nginx (don't need for development)
 
 
-Start your project
-------------------
+Leela managament tool
+=====================
+
+You can create, start and stop your applications using **leela** tool.
+
+    Usage:
+
+    leela new-project <project name> [<base path>]
+    or
+    leela start <configuration name> [<project path>]
+    or
+    leela stop [<project path>]
+
+
 
 You can create template for new project using following command:
 
@@ -46,6 +58,75 @@ Service should be started at http://127.0.0.1:8080/
 
 Ok.. now you can implement your service using python3 and create veiw layer in HTML+CSS+AngularJS (if you need it)
 
+
+Leela configuration
+===================
+
+You should specify your configuration files in `project path`/config directory. By default,
+leela has test.yaml and production.yaml configuration files.
+
+
+Configuration file format
+-------------------------
+
+    leela:
+        bind_address: <bind IP address>
+        *bind_port: <bind port (80 by default)>*
+        *monitor_changes: <true|false (false by default)>*
+        *leela_proc_count: <leela workers count (-1 = cpu_count by default)*
+        *logger_config: <logger config file name (logger.yaml by default)>*
+        *need_daemonize: <true|false (true by default)>*
+        *user: <owner of the application (leela by default)>*
+        *static_path: <path to static files (project_path/www by default)>*
+        *nginx_proxy: <true|false (false by default)>*
+        *nginx_exec: <path to nginx exec (/usr/sbin/nginx by default)*
+        *python_exec: <path to Python exec (python3 by default)*
+
+        *ssl:*
+            ssl_cert: <path to SSL certificate>
+            ssl_key: <path to SSL key>
+            ssl_only: <true|false (false by default)> 
+
+        services:
+            - endpoint: <service endpoint - python module path>
+              *config: <configuration dictionary ({} by default)*
+            ...
+
+        *activities:*
+            - endpoint: <activity endpoint - python module path>
+              *config: <configuration dictionary ({} by default)*
+            ...
+            
+
+        *sessions_manager:*
+            *endpoint: <sessions manager endpoint - python module path>*
+
+
+    *CORS:*
+        - url_regex: <URL regexp for CORS apply>
+          allow_origin: <list of allowed origin ([] by default)>
+          allow_credentials: <true|false (false by default)>
+          allow_methods: <list of allowed HTTP methods ([GET, POST, PUT, PATCH, DELETE, OPTIONS] by default)>
+          allow_headers: <list of allowed HTTP headers (['x-requested-with', 'content-type', 'accept',
+                                                        'origin', 'authorization', 'x-csrftoken'] by default)>
+        ...
+
+
+
+Values of parameters in *leela* section of configuration file can be environment variables.
+For example:
+
+    test0: $TEST_ENV_VAR
+    test1: $TEST_ENV_VAR || 'my test value'
+    test2: $HOME || '/my/home'
+    test3: null || helloo
+    test4: 'my simple string value with "\|\|"'
+    test5: '\$just string with "$" symbol'
+
+
+
+Development
+===========
 
 Service methods
 ---------------
