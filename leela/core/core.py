@@ -265,6 +265,12 @@ class reg_post(reg_api):
             ret[key] = data.get(key)
         return ret
 
+class reg_put(reg_post):
+    method = 'PUT'
+
+class reg_delete(reg_post):
+    method = 'DELETE'
+
 class reg_form_post(reg_api):
     method = 'POST'
 

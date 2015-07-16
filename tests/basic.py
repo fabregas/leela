@@ -38,6 +38,18 @@ class A(AService):
     def test3(self, data, http_req):
         return self.__incoming
 
+    @reg_put('incoming')
+    def test2_put(self, data, http_req):
+        print('PUT test func ...', data)
+        self.__incoming[data.key] = data.value
+        return True
+
+    @reg_delete('incoming')
+    def test2_delete(self, data, http_req):
+        print('DELETE test func ...', data)
+        del self.__incoming[data.key]
+        return True
+
 class B(A):
     FNAME = None
     FCONT = None
@@ -131,6 +143,28 @@ class TestBasicAPI(unittest.TestCase):
         data = yield from r.json()
         self.assertEqual(data, payload)
 
+        r = yield from aiohttp.request('put', 'http://0.0.0.0:6666/api/incoming', 
+                            data=json.dumps({'key':'NEW_KEY', 'value': 33.3})) 
+        self.assertEqual(r.status, 200)
+        data = yield from r.json()
+        self.assertEqual(data, True)
+
+        r = yield from aiohttp.request('get', 'http://0.0.0.0:6666/api/incoming') 
+        data = yield from r.json()
+        payload['NEW_KEY'] = 33.3
+        self.assertEqual(data, payload)
+
+        #delete...
+        r = yield from aiohttp.request('delete', 'http://0.0.0.0:6666/api/incoming', 
+                            data=json.dumps({'key':'key2'})) 
+        self.assertEqual(r.status, 200)
+        data = yield from r.json()
+        self.assertEqual(data, True)
+
+        r = yield from aiohttp.request('get', 'http://0.0.0.0:6666/api/incoming') 
+        data = yield from r.json()
+        del payload['key2']
+        self.assertEqual(data, payload)
 
     @async_test
     def test_get(self):
