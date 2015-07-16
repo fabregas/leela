@@ -122,7 +122,7 @@ Configuration file format
                                                         'origin', 'authorization', 'x-csrftoken'] by default)>
         ...
 
-Parameters markes as '\*' are optional.
+Parameters that marked as '\*' are optional.
 
 
 Values of parameters in *leela* section of configuration file can be environment variables.
