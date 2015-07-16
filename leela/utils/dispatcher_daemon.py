@@ -251,7 +251,7 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
                                  config.logger_config_path,
                                  config.services,
                                  config.sessions_manager, lp_is_ssl,
-                                 lp_bind_addr, is_unixsocket])
+                                 lp_bind_addr, is_unixsocket, config.static_path])
 
         cor = s_mgmt.start(config.python_exec,
                            os.path.join(bin_dir, 'leela-worker'),
@@ -282,12 +282,14 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
 
 def _run_nginx(loop, home_path, proj_name, config,
                leela_processes,  bind_sockets):
-    if config.is_nginx_proxy:
-        static_path = os.path.abspath(os.path.join(home_path, 'www'))
 
+    if not config.static_path:
+        config.static_path = os.path.abspath(os.path.join(home_path, 'www'))
+
+    if config.is_nginx_proxy:
         cnf_file = _make_nginx_config(config.username, proj_name,
                                       bind_sockets, config.bind_port,
-                                      static_path, config.ssl_cert,
+                                      config.static_path, config.ssl_cert,
                                       config.ssl_key,
                                       config.ssl_only)
         nginx_mgmt = ServiceMgmt()

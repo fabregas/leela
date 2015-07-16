@@ -14,7 +14,7 @@ from leela.utils.logger import logger
 
 
 def main(name, project_home, conf, logger_config_file, services,
-         sessions_mgr_path, is_ssl, bind_addr, is_unixsocket):
+         sessions_mgr_path, is_ssl, bind_addr, is_unixsocket, static_path):
 
     sys.path.append(os.path.join(project_home, 'services'))
 
@@ -31,7 +31,8 @@ def main(name, project_home, conf, logger_config_file, services,
                                       service['srv_config'])
             loop.run_until_complete(future)
         
-        static_path = os.path.join(project_home, 'www')
+        if not static_path:
+            static_path = os.path.join(project_home, 'www')
         app.handle_static(static_path)
 
         if sessions_mgr_path:
@@ -103,7 +104,7 @@ if __name__ == '__main__':
         mode = args.pop(0)
         if mode == 'services':
             main(name, args[0], args[1], args[2],
-                 args[3], args[4], args[5], args[6], args[7])
+                 args[3], args[4], args[5], args[6], args[7], args[8])
         elif mode == 'activity':
             main_activity(name, args[0], args[1], args[2], args[3])
         else:

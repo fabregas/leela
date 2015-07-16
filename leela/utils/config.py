@@ -37,6 +37,7 @@ class LeelaConfig(object):
         self.__config['logger_config_path'] = os.path.join(self.__project_path,
                                                            'config',
                                                            logger_config)
+        self.__config['static_path'] = self.__gv(config, 'static_path')
 
         services_cfg = config['services']
         services = []
