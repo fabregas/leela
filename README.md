@@ -8,7 +8,7 @@ Leela
 
 
   * [Installation](#installation)
-  * [Leela managament tool](#leela-managament-tool)
+  * [Leela management tool](#leela-management-tool)
   * [Leela configuration](#leela-configuration)
     * [Configuration file format](#configuration-file-format)
   * [Development](#development)
@@ -29,7 +29,7 @@ Dependencies:
     nginx (don't need for development)
 
 
-Leela managament tool
+Leela management tool
 =====================
 
 You can create, start and stop your applications using **leela** tool.
