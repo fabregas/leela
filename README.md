@@ -38,6 +38,8 @@ You can create, start and stop your applications using **leela** tool.
 
     leela new-project <project name> [<base path>]
     or
+    leela build [<project path>]
+    or
     leela start <configuration name> [<project path>]
     or
     leela stop [<project path>]
