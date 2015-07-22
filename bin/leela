@@ -3,201 +3,50 @@
 import os
 import sys
 import yaml
+import tempfile
+import shutil
+import zipfile
 import urllib.request
 
 import leela
 from leela.utils import dispatcher_daemon
 from leela.utils.config import LeelaConfig
 
-INDEX_HTML = '''<html>
-    <head>
-        <script src="/static/js/angular.min.js"></script>
-        <script src="/static/js/leela.js"></script>
-    </head>
-
-    <body>
-        <h1>Hello, Leela</h1>
-    </body>
-</html>
-'''
-
-TEST_YAML = '''leela:
-    bind_address: 127.0.0.1
-    bind_port: 8080
-    monitor_changes: yes
-    nginx_proxy: false
-    leela_proc_count: 1
-    logger_config: logger-test.yaml
-    daemonize: false
-    services:
-        - endpoint: service.py
-          config:
-             db_name: {}_test_db
-    sessions_manager:
-        endpoint: leela.core.sessions.InMemorySessionsManager
-'''
-
-PRODUCTION_YAML = '''leela:
-    bind_address: 0.0.0.0
-    bind_port: 8080
-    monitor_changes: true
-    leela_proc_count: -1
-    logger_config: logger-production.yaml
-    nginx_proxy: true
-    nginx_exec: /usr/sbin/nginx
-    services:
-        - endpoint: service.py
-          config:
-             db_name: {}_prod_db
-    sessions_manager:
-        endpoint: leela.db_support.mongo.MongoSessionsManager
-
-CORS:
-    - url_regex: '^.*$'
-      allow_origin: []
-      allow_credentials: false #true
-      allow_methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-      allow_headers: ['x-requested-with', 'content-type', 'accept',
-                      'origin', 'authorization', 'x-csrftoken']
- 
-    - url_regex: '^/api/.*$'
-      allow_origin: ['*']
-      allow_credentials: true
-      
-'''
-
-SERVICE_PY = '''#!/usr/bin/python
-
-from leela.core import *
-from leela.db_support.mongo import MongoDB
-
-class MyService(AService):
-    @classmethod
-    def initialize(cls, config):
-        if 'db_name' not in config:
-            raise RuntimeError('db_name does not found in YAML config')
-        db = MongoDB(config.get('db_name', None))
-        yield from db.connect(config.get('db_hostname', '127.0.0.1'),
-                              config.get('db_port', 27017))
-
-        Model.init(db)
-
-        return cls(db)
-
-    # TODO: implement your API here...
-'''
-
-LOGGING_CFG_TEST = '''
-version: 1
-formatters:
-    verbose:
-        format: '%(levelname)s %(module)s %(process)d %(message)s'
-    simple:
-        format: '%(levelname)s %(message)s'
-handlers:
-    console:
-        level: INFO
-        class: logging.StreamHandler
-        formatter: simple
-    syslog:
-        level: INFO
-        class: logging.handlers.SysLogHandler
-        address: '/dev/log'
-        formatter: verbose
-loggers:
-    leela:
-        handlers: [console, syslog]
-        level: INFO
-    asyncio_mongo:
-        handlers: [console]
-        level: INFO
-    aiohttp.access:
-        handlers: [console]
-        level: INFO
-    aiohttp.server:
-        handlers: [console]
-        level: INFO
-'''
-
-LOGGING_CFG_PROD = '''
-version: 1
-formatters:
-    verbose:
-        format: '%(levelname)s %(module)s %(process)d %(message)s'
-handlers:
-    syslog:
-        level: INFO
-        class: logging.handlers.SysLogHandler
-        address: '/dev/log'
-        formatter: verbose
-loggers:
-    leela:
-        handlers: [syslog]
-        level: INFO
-    asyncio_mongo:
-        handlers: [syslog]
-        level: INFO
-    aiohttp.access:
-        handlers: [syslog]
-        level: INFO
-    aiohttp.server:
-        handlers: [syslog]
-        level: WARNING
-'''
-
-
-def install_js_base(js_path):
-    try:
-        print('- downloading leela.js ...')
-        resp = urllib.request.urlopen('https://raw.githubusercontent.com/'
-                                      'fabregas/leela/master/leela/angular'
-                                      '/leela.js')
-        leela_js = resp.read().decode()
-    except urllib.error.URLError as e:
-        raise RuntimeError('leela.js does not found!')
-
-    open(os.path.join(js_path, 'leela.js'), 'w').write(leela_js)
-
-    try:
-        print('- downloading angular.min.js ...')
-        resp = urllib.request.urlopen('https://ajax.googleapis.com/ajax/libs/'
-                                      'angularjs/1.0.6/angular.min.js')
-
-        angular_js = resp.read().decode()
-    except urllib.error.URLError as e:
-        print('WARNING! angular.min.js does not found!')
-
-    open(os.path.join(js_path, 'angular.min.js'), 'w').write(angular_js)
-
 
 def start_project(base_path, project_name):
     if not os.path.exists(base_path):
         raise RuntimeError('Path {} does not found'.format(base_path))
 
-    path = os.path.join(base_path, project_name)
-    if os.path.exists(path):
-        raise RuntimeError('Path {} is already exists'.format(path))
+    P_URL = 'https://github.com/fabregas/leela-init-project/archive/master.zip'
+    P_NAME = 'leela-init-project-master'
 
-    os.mkdir(path)
-    for folder in ('www/templates', 'www/js', 'www/css', 'www/img',
-                   'config', 'services'):
-        os.makedirs(os.path.join(path, folder))
+    try:
+        print('- downloading init project structure ...')
+        resp = urllib.request.urlopen(P_URL)
+        zip_arch = resp.read()#.decode()
+    except urllib.error.URLError as e:
+        raise RuntimeError('<leela-init-project> does not found!')
 
-    open(os.path.join(path, 'www/index.html'), 'w').write(INDEX_HTML)
-    open(os.path.join(path, 'services/service.py'), 'w').write(SERVICE_PY)
-    open(os.path.join(path, 'config/test.yaml'),
-         'w').write(TEST_YAML.format(project_name))
-    open(os.path.join(path, 'config/logger-test.yaml'),
-         'w').write(LOGGING_CFG_TEST)
-    open(os.path.join(path, 'config/logger-production.yaml'),
-         'w').write(LOGGING_CFG_PROD)
-    open(os.path.join(path, 'config/production.yaml'),
-         'w'). write(PRODUCTION_YAML.format(project_name))
+    tmp_dir = tempfile.mkdtemp()
+    zip_source = os.path.join(tmp_dir, 'master.zip')
 
-    install_js_base(os.path.join(path, 'www/js'))
+    open(zip_source, 'wb').write(zip_arch)
+
+    zip_source = zipfile.ZipFile(zip_source)
+
+    dest_path = os.path.join(base_path, project_name)
+    if os.path.exists(dest_path):
+        raise RuntimeError('Path {} is already exists'.format(dest_path))
+
+    zip_source.extractall(tmp_dir)
+    zip_source.close()
+
+    shutil.move(os.path.join(tmp_dir, P_NAME), dest_path)
+
+    shutil.rmtree(tmp_dir)
 
     print('='*80)
-    print('New Leela project is started at {}'.format(path))
+    print('New Leela project is started at {}'.format(dest_path))
     print('='*80)
     print(' -> write your home HTML in www/index.html file')
     print(' -> save your HTML templates (for angularjs) '
@@ -205,6 +54,10 @@ def start_project(base_path, project_name):
     print(' -> save your javascript scripts in www/js directory')
     print(' -> save your css files in www/css directory')
     print(' -> save your static images into www/img directory')
+    print('\n Build/rebuild your front-end dependencies using commands:')
+    print('\t\t# leela build')
+    print('\n Run your project in test mode using command:')
+    print('\t\t# leela start test')
     print('='*80)
 
 
@@ -248,9 +101,28 @@ def stop_server(project_path):
     dispatcher_daemon.stop(project_path)
 
 
+def build_proj(project_path):
+    os.chdir(project_path)
+    ret = os.system('npm install')
+    if ret:
+        raise RuntimeError('<npm install> failed!')
+
+    ret = os.system('bower install')
+    if ret:
+        raise RuntimeError('<bower install> failed!')
+
+    ret = os.system('gulp')
+    if ret:
+        raise RuntimeError('<gulp> failed!')
+
+    print('Done.')
+
+
 def usage():
     print('Usage:')
     print('leela new-project <project name> [<base path>]')
+    print('  or')
+    print('leela build [<project path>]')
     print('  or')
     print('leela start <configuration name> [<project path>]')
     print('  or')
@@ -262,7 +134,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 2:
         usage()
 
-    if sys.argv[1] != 'stop' and len(sys.argv) < 3:
+    if sys.argv[1] not in ['stop', 'build'] and len(sys.argv) < 3:
         usage()
 
     cur = os.path.abspath('.')
@@ -283,6 +155,11 @@ if __name__ == '__main__':
                 cur = sys.argv[2]
 
             stop_server(cur)
+        elif sys.argv[1] == 'build':
+            if len(sys.argv) > 2:
+                cur = sys.argv[2]
+
+            build_proj(cur)
         else:
             usage()
         sys.exit(0)

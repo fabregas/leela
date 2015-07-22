@@ -48,8 +48,7 @@ You can create template for new project using following command:
 
     # leela new-project first_leela_project
     
-        - downloading leela.js ...
-        - downloading angular.min.js ...
+        - downloading init project structure ...
         ================================================================================
         New Leela project is started at /home/fabregas/first_leela_project
         ================================================================================
@@ -58,6 +57,12 @@ You can create template for new project using following command:
         -> save your javascript scripts in www/js directory
         -> save your css files in www/css directory
         -> save your static images into www/img directory
+
+        Build/rebuild your front-end dependencies using commands:
+            # leela build
+
+        Run your project in test mode using command:
+            # leela start test
         ================================================================================
 
 Now you can start test server:
