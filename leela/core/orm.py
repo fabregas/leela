@@ -65,6 +65,10 @@ class Model(object, metaclass=ModelMeta):
         return cls.__query_result_class(cls.__db, cls, query)
 
     @classmethod
+    def find_one(cls, **query):
+        return cls.find(**query).first()
+
+    @classmethod
     def get(cls, obj_id):
         res = cls.__query_result_class(cls.__db, cls, {cls._id: obj_id})
 
@@ -137,6 +141,12 @@ class QueryResult(object):
 
     def explain(self):
         return self
+
+    def count(self):
+        pass
+
+    def first(self):
+        return None
 
     @asyncio.coroutine
     def __iter__(self):

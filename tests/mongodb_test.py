@@ -98,6 +98,15 @@ class TestMongoBackend(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             yield from Log.find(some_other=4)
 
+        log_obj = yield from Log.find_one(log_msg='second msg')
+        self.assertEqual(log_obj.log_msg, 'second msg')
+
+        log_obj = yield from Log.find_one(log_msg='unknown')
+        self.assertEqual(log_obj, None)
+
+        log_obj = yield from Log.find_one()
+        self.assertNotEqual(log_obj, None)
+        self.assertTrue(isinstance(log_obj, Log))
         
         #filters
         for i in range(100):
@@ -109,6 +118,12 @@ class TestMongoBackend(unittest.TestCase):
         self.assertEqual(log_objs[0].log_msg, 'first msg')
         self.assertEqual(log_objs[1].log_msg, 'third msg')
         self.assertEqual(log_objs[2].log_msg, 'second msg')
+
+        log_obj_cnt = yield from Log.find().count()
+        self.assertEqual(log_obj_cnt, 103, log_obj_cnt)
+
+        log_obj_cnt = yield from Log.find(log_level=4).count()
+        self.assertEqual(log_obj_cnt, 100, log_obj_cnt)
 
         log_objs = yield from Log.find().sort(log_msg=-1).skip(1).limit(1)
         log_objs = list(log_objs)

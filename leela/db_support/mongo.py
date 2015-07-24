@@ -16,6 +16,8 @@ class MongoQueryResult(QueryResult):
         self.__filter = None
         self.__limit = None
         self.__skip = None
+        self.__ret_cnt = False
+        self.__find_one = False
 
         self.__db = db
         self.__model_class = model_class
@@ -76,6 +78,14 @@ class MongoQueryResult(QueryResult):
         self.__skip = cnt
         return self
 
+    def count(self):
+        self.__ret_cnt = True
+        return self
+
+    def first(self):
+        self.__find_one = True
+        return self
+
     def __iter__(self):
         collection = self.__db[self.__metaname]
         params = {}
@@ -85,6 +95,17 @@ class MongoQueryResult(QueryResult):
             params['skip'] = self.__skip
         if self.__filter:
             params['filter'] = self.__filter
+
+        if self.__ret_cnt:
+            cnt = yield from collection.count(self.__query)
+            return cnt
+
+        if self.__find_one:
+            data = yield from collection.find(self.__query, **params)
+            if not data:
+                return None
+            else:
+                return list(model_iterator(self.__model_class, data))[0]
 
         data = yield from collection.find(self.__query, **params)
 
