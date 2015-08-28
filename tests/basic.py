@@ -12,9 +12,15 @@ sys.path.append(os.path.abspath('.'))
 from leela.core import *
 from leela.db_support.inmemory import InMemoryDatabase 
 from leela.db_support.mongo import MongoDB as InMemoryDatabase 
+from leela.utils.test_utils import TestLeelaServer
 
 
 class A(AService):
+    @classmethod
+    @asyncio.coroutine
+    def initialize(cls, configuration):
+        return cls(None, configuration.get('a', 0))
+
     def __init__(self, db, a):
         super().__init__(db)
         self.__a = a
@@ -56,7 +62,7 @@ class B(A):
     @classmethod
     @asyncio.coroutine
     def initialize(cls, config):
-        return cls(DB, 2222, 4444)
+        return cls(DB, config.get('a', 2222), 4444)
 
     def __init__(self, db, a, b):
         super().__init__(db, a)
@@ -275,6 +281,7 @@ class TestBasicAPI(unittest.TestCase):
 
         self.assertEqual(B.FNAME, 'basic.py')
         self.assertEqual(B.STREAM_SHA1, hashlib.sha1(open(__file__, 'rb').read()).hexdigest())
+
 
 
 if __name__ == '__main__':

@@ -49,6 +49,9 @@ class Application(object):
                                .format(err))
 
     def _init_module(self, module_name, base_class):
+        if type(module_name) == type and issubclass(module_name, base_class):
+            return module_name
+
         if module_name.endswith('.py'):
             module_name = module_name[:-3]
 
