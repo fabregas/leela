@@ -1,6 +1,7 @@
 
 import asyncio
 import asyncio_mongo
+from asyncio_mongo._bson import ObjectId
 import hashlib
 import pickle
 
@@ -9,8 +10,14 @@ from leela.core.orm import AbstractDatabase
 from leela.core.orm import QueryResult
 from leela.core.orm import model_iterator
 
+def get_key_class(key, val):
+    if key == '_id' and type(val) == str:
+        return ObjectId(val)
+    return val
 
 class MongoQueryResult(QueryResult):
+    _key_class = get_key_class
+
     def __init__(self, db, model_class, query):
         self.__query = query
         self.__filter = None

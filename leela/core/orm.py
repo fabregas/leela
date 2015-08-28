@@ -55,10 +55,13 @@ class Model(object, metaclass=ModelMeta):
                 arg = self._id
             self.__args[arg] = val
 
+    def get_id(self):
+        return self.__args[self._id]
+
     @classmethod
     def find(cls, **query):
         for key in query:
-            if key not in cls.__f_keys:
+            if key != cls._id and key not in cls.__f_keys:
                 raise RuntimeError('"{}" attribute does not found for "{}"'.
                                    format(key, cls.__name__))
 
@@ -70,7 +73,9 @@ class Model(object, metaclass=ModelMeta):
 
     @classmethod
     def get(cls, obj_id):
-        res = cls.__query_result_class(cls.__db, cls, {cls._id: obj_id})
+        key_class = cls.__query_result_class._key_class 
+        res = cls.__query_result_class(cls.__db, cls,
+                                       {cls._id: key_class(cls._id, obj_id)})
 
         res = yield from res
         res = list(res)
@@ -89,7 +94,11 @@ class Model(object, metaclass=ModelMeta):
         return res
 
     def to_dict(self):
-        return copy(self.__args)
+        ret = copy(self.__args)
+        for key, value in ret.items():
+            if type(value) not in (dict, list, tuple, str, int, float, bool):
+                ret[key] = str(value)
+        return ret
 
     def __getattribute__(self, attr):
         if attr[0] == '_':
@@ -118,8 +127,13 @@ def model_iterator(model_class, data):
     for item in data:
         yield model_class(**item)
 
+def default_key_class(key, val):
+    return val
+
 
 class QueryResult(object):
+    _key_class = default_key_class
+
     def __init__(self, db, model_class, query):
         pass
 

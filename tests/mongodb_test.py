@@ -100,8 +100,15 @@ class TestMongoBackend(unittest.TestCase):
 
         log_obj = yield from Log.find_one(log_msg='second msg')
         self.assertEqual(log_obj.log_msg, 'second msg')
+        lo_id = log_obj.get_id()
+
+        log_obj2 = yield from Log.get(str(lo_id))
+        self.assertEqual(log_obj.log_msg, log_obj2.log_msg)
 
         log_obj = yield from Log.find_one(log_msg='unknown')
+        self.assertEqual(log_obj, None)
+
+        log_obj = yield from Log.get('507f1f77bcf86cd799439011')
         self.assertEqual(log_obj, None)
 
         log_obj = yield from Log.find_one()
