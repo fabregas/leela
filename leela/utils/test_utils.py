@@ -5,6 +5,7 @@ import sys
 import logging
 import logging.config
 import asyncio
+import aiohttp
 import signal
 import json
 import functools
@@ -34,14 +35,17 @@ loggers:
     leela:
         handlers: [console, syslog]
         level: INFO
+    {}:
+        handlers: [console, syslog]
+        level: INFO
 '''
 
 class TestLeelaServer(object):
-    def __init__(self, loop=None):
+    def __init__(self, loop=None, custom_logger_name='test'):
         self.loop = loop or asyncio.get_event_loop()
         self.app = Application()
 
-        logging.config.dictConfig(yaml.load(CONFIG))
+        logging.config.dictConfig(yaml.load(CONFIG.format(custom_logger_name)))
 
     def add_service(self, service_class, config):
         logger.info('starting test service {}...'.format(service_class))
@@ -54,6 +58,7 @@ class TestLeelaServer(object):
         self.loop.run_until_complete(future)
 
     def start(self, port):
+        self.port = port
         logger.info('starting test TCP server at 127.0.0.1:{}...'.format(port))
         self.app.make_tcp_server('127.0.0.1', port)
 
@@ -61,6 +66,18 @@ class TestLeelaServer(object):
         logger.info('stoping test application...')
         future = self.app.destroy()
         self.loop.run_until_complete(future)
+
+    @asyncio.coroutine
+    def call_api(self, method, params={}, http_method='GET'):
+        url = 'http://127.0.0.1:{}/api/{}'.format(self.port, method)
+        response = yield from aiohttp.request(http_method, url, params=params)
+        if response.status != 200:
+            data = yield from response.text()
+            raise RuntimeError('ERROR while call {}: [{}]'.format(url, data))
+
+        data = yield from response.json()
+        return data
+
 
 
 

@@ -46,6 +46,9 @@ class TestUtilsAPI(unittest.TestCase):
         raw_html = tls.loop.run_until_complete(get_body('http://127.0.0.1:44444/api/test_path'))
         print(raw_html)
         assert raw_html == b'["test sting", 1, 32555]'
+
+        data = tls.loop.run_until_complete(tls.call_api('test_path', {'sss': 33}))
+        self.assertEqual(data, ['test sting', 1, 32555, {'sss': '33'}])
      
         tls.stop()
 
