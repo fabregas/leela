@@ -25,7 +25,8 @@ You can install `leela` package using pip3:
 
 Dependencies:
 
-    PyYAML (check the name for your linux distro)
+    PyYAML
+    aiohttp
     nginx (don't need for development)
 
 
