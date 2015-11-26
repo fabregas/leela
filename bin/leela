@@ -8,6 +8,7 @@ import shutil
 import zipfile
 import urllib.request
 
+import asyncio
 import leela
 from leela.utils import dispatcher_daemon
 from leela.utils.config import LeelaConfig
@@ -85,9 +86,12 @@ def start_server(project_path, config_name):
 
     bin_dir = os.path.abspath(os.path.dirname(__file__))
 
+    loop = asyncio.get_event_loop()
     try:
         while True:
-            retcode = dispatcher_daemon.start(bin_dir, project_path, lconfig)
+
+            retcode = dispatcher_daemon.start(
+                bin_dir, project_path, lconfig, loop=loop)
             if lconfig.monitor_changes and retcode == 1:
                 continue
             break
@@ -95,7 +99,8 @@ def start_server(project_path, config_name):
         print(err)
     except KeyboardInterrupt as err:
         pass
-
+    finally:
+        loop.close()
 
 def stop_server(project_path):
     dispatcher_daemon.stop(project_path)

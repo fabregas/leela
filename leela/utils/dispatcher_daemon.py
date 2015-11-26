@@ -229,7 +229,7 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
     env = copy.copy(os.environ)
     env['PYTHONPATH']= os.path.abspath(os.path.dirname(leela.__file__))\
         .rstrip('leela')
-            
+
 
     for i in range(config.leela_proc_count):
         s_mgmt = ServiceMgmt(config.username)
@@ -316,8 +316,6 @@ def _stop_processes(loop, leela_processes):
         except Exception as err:
             logger.error('proc.stop() faied: {}'.format(err))
 
-    # loop.close()
-
 
 @asyncio.coroutine
 def _check_changes(path):
@@ -335,7 +333,7 @@ def _check_changes(path):
         yield from asyncio.sleep(1)
 
 
-def start(bin_dir, home_path, config):
+def start(bin_dir, home_path, config, *, loop):
     if os.path.exists(config.logger_config_path):
         logging.config.dictConfig(yaml.load(open(config.logger_config_path)))
     else:
@@ -362,7 +360,6 @@ def start(bin_dir, home_path, config):
     leela_processes = []
     bind_sockets = []
     try:
-        loop = asyncio.get_event_loop()
         leela_processes, bind_sockets = _run_leela_processes(loop, bin_dir,
                                                              home_path,
                                                              proj_name,
