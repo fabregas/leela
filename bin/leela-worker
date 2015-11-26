@@ -30,7 +30,7 @@ def main(name, project_home, conf, logger_config_file, services,
             future = app.init_service(service['srv_endpoint'],
                                       service['srv_config'])
             loop.run_until_complete(future)
-        
+
         if not static_path:
             static_path = os.path.join(project_home, 'www')
         app.handle_static(static_path)
@@ -58,7 +58,7 @@ def main(name, project_home, conf, logger_config_file, services,
         pass
 
 def main_activity(name, project_home, logger_config_file,
-                  act_endpoint, act_config): 
+                  act_endpoint, act_config):
     sys.path.append(os.path.join(project_home, 'activities'))
     if logger_config_file != '--noconf':
         app.set_logger_config(logger_config_file)
@@ -78,12 +78,13 @@ def stop(s='', n=''):
         return
     stopped = True
 
-    loop.stop()
     logger.info('[{}] destroing service...'.format(name))
     try:
         yield from app.destroy()
     except Exception as err:
         logger.error('[{}] destroy routine failed: {}'.format(name, err))
+
+    loop.stop()
     logger.info('[{}] finished'.format(name))
 
 
@@ -95,7 +96,8 @@ if __name__ == '__main__':
     try:
         stopped = False
         loop = asyncio.get_event_loop()
-        loop.add_signal_handler(signal.SIGINT, lambda: asyncio.async(stop(signal.SIGINT)))
+        loop.add_signal_handler(signal.SIGINT,
+                                lambda: asyncio.async(stop(signal.SIGINT)))
 
         app = Application()
         name = sys.argv[1]

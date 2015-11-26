@@ -19,6 +19,8 @@ class Application(object):
         self.__services = []
         self.__activities = []
         self.__unixsocket = None
+        self.__server = None
+        self.__handler = None
 
     def set_http_config(self, htt_config):
         reg_api.set_default_headers(htt_config.get('headers', {}))
@@ -145,8 +147,9 @@ class Application(object):
     def make_tcp_server(self, host, port):
         self.__make_router()
         loop = asyncio.get_event_loop()
-        future = loop.create_server(self.__app.make_handler(), host, port)
-        return loop.run_until_complete(future)
+        self.__handler = self.__app.make_handler()
+        future = loop.create_server(self.__handler, host, port)
+        self.__server = loop.run_until_complete(future)
 
     def make_unix_server(self, path):
         self.__make_router()
@@ -154,19 +157,30 @@ class Application(object):
         if os.path.exists(self.__unixsocket):
             os.unlink(self.__unixsocket)
         loop = asyncio.get_event_loop()
-        future = loop.create_unix_server(self.__app.make_handler(), path)
-        return loop.run_until_complete(future)
+        self.__handler = self.__app.make_handler()
+        future = loop.create_unix_server(self.__handler, path)
+        self.__server = loop.run_until_complete(future)
 
     @asyncio.coroutine
     def destroy(self):
+        if self.__handler:
+            yield from self.__handler.finish_connections(1.0)
+
         for service in self.__services:
             yield from service.destroy()
 
         for activity in self.__activities:
             yield from activity.destroy()
 
+        if self.__server:
+            self.__server.close()
+            yield from self.__server.wait_closed()
+
+        yield from self.__app.finish()
+
         self.__services = []
         self.__activities = []
+        self.__server = None
 
         if self.__unixsocket:
             os.unlink(self.__unixsocket)
