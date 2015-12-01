@@ -6,34 +6,8 @@ import pickle
 import hashlib
 import asyncio
 
-from .orm import Model
-
 
 DEFAULT_EXPIRE_TIME = 60*60*24*30  # 30 days
-
-SESSION_USER = '_user_'
-
-
-class User(Model):
-    _id = 'username'
-
-    username = None
-    password_digest = None
-    roles = []
-    additional_info = {}
-
-    def get_roles(self):
-        return set(self.roles) if self.roles else set()
-
-    def check_password(self, password):
-        pwd_digest = hashlib.sha1(password.encode()).hexdigest()
-        return pwd_digest == self.password_digest
-
-    @classmethod
-    def create(cls, username, password, roles, **additional_info):
-        pwd_digest = hashlib.sha1(password.encode()).hexdigest()
-        return User(username=username, password_digest=pwd_digest, roles=roles,
-                    additional_info=additional_info)
 
 
 class Session(object):
@@ -63,13 +37,8 @@ class Session(object):
     def set_id(self, session_id):
         self.__session_id = session_id
 
-    def _get_user(self):
-        return self.get(SESSION_USER)
-
-    def _set_user(self, user):
-        self.set(SESSION_USER, user)
-
-    user = property(_get_user, _set_user)
+    def remove(self):
+        self.need_remove = True
 
     def dump(self):
         return pickle.dumps(self)
@@ -79,13 +48,11 @@ class Session(object):
         return pickle.loads(dump)
 
 
-
-
-class AbstractSessionsManager(object):
+class BaseSessionManager(object):
     def __init__(self, expire_time=DEFAULT_EXPIRE_TIME):
         self.expire_time = expire_time
 
-    def random_uid(self):
+    def generate_session_id(self):
         return ''.join(random.SystemRandom().choice(
                     string.ascii_letters + string.digits) for _ in range(32))
 
@@ -94,12 +61,26 @@ class AbstractSessionsManager(object):
         session.expire_time = exp_time
 
     @asyncio.coroutine
+    def start(self):
+        """start session manager
+        Can be inherited
+        """
+        pass
+
+    @asyncio.coroutine
+    def stop(self):
+        """stop session manager
+        Can be inherited
+        """
+        pass
+
+    @asyncio.coroutine
     def get(self, session_id):
         '''get session dict'''
         pass
 
     @asyncio.coroutine
-    def set(self, session_id, session):
+    def set(self, session):
         '''set session dict'''
         pass
 
@@ -108,24 +89,14 @@ class AbstractSessionsManager(object):
         '''remove session'''
         pass
 
-    @asyncio.coroutine
-    def check_sessions(self):
-        '''remove expired sessions'''
-        pass
 
-
-class InMemorySessionsManager(AbstractSessionsManager):
+class InMemorySessionsManager(BaseSessionManager):
     def __init__(self, expire_time=DEFAULT_EXPIRE_TIME):
         super().__init__(expire_time)
         self.__sessions = {}
 
-    @asyncio.coroutine
     def count(self):
         return len(self.__sessions)
-
-    @asyncio.coroutine
-    def check_sessions(self):
-        pass
 
     @asyncio.coroutine
     def get(self, session_id):
@@ -141,7 +112,7 @@ class InMemorySessionsManager(AbstractSessionsManager):
         session_id = session.get_id()
         if session_id is None:  # new session
             while True:
-                session_id = self.random_uid()
+                session_id = self.generate_session_id()
                 if session_id not in self.__sessions:
                     break
         exp_time = time.time() + self.expire_time

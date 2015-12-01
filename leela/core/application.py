@@ -6,40 +6,21 @@ import logging
 import logging.config
 import importlib
 import asyncio
+import copy
 from aiohttp import web
 
-from leela.core.core import reg_api, CORS
-from leela.core.service import AService
-from leela.core.activity import AActivity
+from leela.core.decorators import leela_api
+from leela.core.service import LeelaService
+from leela.core.middleware import LeelaMiddleware
 
 
 class Application(object):
     def __init__(self):
         self.__app = web.Application()
         self.__services = []
-        self.__activities = []
         self.__unixsocket = None
         self.__server = None
         self.__handler = None
-
-    def set_http_config(self, htt_config):
-        reg_api.set_default_headers(htt_config.get('headers', {}))
-
-    def set_cors_config(self, cors_config):
-        '''
-        - url_regex: '^.*$'
-          allow_origin: []
-          allow_credentials: false #true
-          allow_methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
-          allow_headers: ['x-requested-with', 'content-type', 'accept',
-                          'origin', 'authorization', 'x-csrftoken']
-        ...
-        '''
-        cors_list = []
-        for rule in cors_config:
-            cors_list.append(CORS(rule))
-
-        reg_api.set_cors_rules(cors_list)
 
     def set_logger_config(self, logger_config_path):
         try:
@@ -50,81 +31,79 @@ class Application(object):
             raise RuntimeError('Invalid logger config file: {}'
                                .format(err))
 
-    def _init_module(self, module_name, base_class):
-        if type(module_name) == type and issubclass(module_name, base_class):
-            return module_name
-
-        if module_name.endswith('.py'):
-            module_name = module_name[:-3]
+    def _import_class(self, class_endpoint):
+        parts = class_endpoint.split('.')
+        class_name = parts.pop(-1)
 
         try:
-            service = importlib.import_module(module_name)
+            module = importlib.import_module('.'.join(parts))
         except ImportError:
-            raise RuntimeError('Module "{}" does not found!'.
-                               format(module_name))
+            raise RuntimeError(
+                'Class "{}" does not found!'.format(class_endpoint))
 
-        class_o = None
-        for attr in dir(service):
-            if attr.startswith('_'):
-                continue
-
-            class_o = getattr(service, attr)
-            try:
-                if class_o != base_class and issubclass(class_o, base_class):
-                    break
-            except TypeError:
-                continue
-        else:
-            raise RuntimeError('No one {} class found in "{}"'.
-                               format(base_class, module_name))
-
-        print('-> found class {}'.format(class_o))
+        class_o = getattr(module, class_name, None)
+        if class_o is None:
+            raise RuntimeError(
+                'Class "{}" does not found!'.format(class_endpoint))
         return class_o
 
-    @asyncio.coroutine
-    def init_service(self, service_name, config):
-        service_class = self._init_module(service_name, AService)
+    def _initialize_class(self, class_obj, config, args_section=None):
+        params = {}
+        for key, value in config.items():
+            if isinstance(value, dict):
+                # this is object config
+                class_endpoint = value.get('endpoint', None)
+                if class_endpoint is None:
+                    raise RuntimeError('"endpoint" does not found for '
+                                       '"{}" object in config'.format(key))
 
-        yield from self.init_service_class(service_class, config)
+                if args_section:
+                    class_config = value.get(args_section, {})
+                else:
+                    class_config = copy.copy(value)
+                    class_config.pop('endpoint')
 
-    @asyncio.coroutine
-    def init_service_class(self, service_class, config):
-        s_instance = yield from service_class.initialize(config)
+                params[key] = self._initialize_class(
+                    self._import_class(class_endpoint), class_config)
+            else:
+                # int, string, list will be passed as is
+                params[key] = value
 
-        reg_api.setup_service(s_instance)
-
-        self.__services.append(s_instance)
-
-    @asyncio.coroutine
-    def init_activity(self, module_name, config):
-        act_class = self._init_module(module_name, AActivity)
-
-        a_instance = yield from act_class.initialize(config)
-        asyncio.async(a_instance.start())
-        self.__activities.append(a_instance)
-
-    def setup_sessions_manager(self, s_manager_obj_path):
-        parts = s_manager_obj_path.split('.')
         try:
-            module_name = '.'.join(parts[:-1])
-            module = importlib.import_module(module_name)
-        except ImportError:
-            raise RuntimeError('Module "{}" does not found!'.
-                               format(module_name))
+            return class_obj(**params)
+        except TypeError as err:
+            raise RuntimeError('{} initialization failed: {}'
+                               .format(class_obj, err))
 
-        class_name = parts[-1]
-        if not hasattr(module, class_name):
-            raise RuntimeError('Class "{}" does not found in {}'
-                               .format(class_name, module_name))
+    @asyncio.coroutine
+    def init_middleware(self, mw_config):
+        def get_mw_instance(mw):
+            return mw
 
-        sessions_manager = getattr(module, class_name)()
-        reg_api.setup_sessions_manager(sessions_manager)
-        return sessions_manager
+        mw_instance = self._initialize_class(
+            get_mw_instance, {'mw': mw_config})
 
-    def __make_router(self):
-        for method, path, handle, _, opt_handler in reg_api.get_routes():
-            self.__app.router.add_route(method, path, handle)
-            self.__app.router.add_route('OPTIONS', path, opt_handler)
+        if not isinstance(mw_instance, LeelaMiddleware):
+            raise RuntimeError('{} MUST be a subclass of LeelaMiddleware'
+                               .format(mw_instance.__class__))
+
+        yield from mw_instance.start()
+        return mw_instance
+
+    @asyncio.coroutine
+    def init_service(self, service_endpoint, config, middlewares):
+        service_class = self._import_class(service_endpoint)
+        if not issubclass(service_class, LeelaService):
+            raise RuntimeError('{} MUST be a subclass of LeelaService'
+                               .format(service_class))
+
+        service_class.set_middlewares(middlewares)
+
+        s_instance = self._initialize_class(service_class, config, 'config')
+        yield from s_instance.start()
+
+        leela_api.setup_service(s_instance)
+        self.__services.append(s_instance)
 
     def handle_static(self, static_path):
         self.__app.router.add_static('/static', static_path)
@@ -143,6 +122,12 @@ class Application(object):
 
         self.__app.router.add_route('GET', '/', root_handler)
         self.__app.router.add_route('OPTIONS', '/', root_opt_handler)
+
+    def __make_router(self):
+        for method, obj_name, handle, _, opt_handler in leela_api.get_routes():
+            path = "/api/{}".format(obj_name)
+            self.__app.router.add_route(method, path, handle)
+            self.__app.router.add_route('OPTIONS', path, opt_handler)
 
     def make_tcp_server(self, host, port):
         self.__make_router()
@@ -169,9 +154,6 @@ class Application(object):
         for service in self.__services:
             yield from service.destroy()
 
-        for activity in self.__activities:
-            yield from activity.destroy()
-
         if self.__server:
             self.__server.close()
             yield from self.__server.wait_closed()
@@ -179,7 +161,6 @@ class Application(object):
         yield from self.__app.finish()
 
         self.__services = []
-        self.__activities = []
         self.__server = None
 
         if self.__unixsocket:

@@ -247,30 +247,16 @@ def _run_leela_processes(loop, bin_dir, home_path, proj_name, config):
         bind_sockets.append(lp_bind_addr)
 
         params_str = json.dumps(['services', home_path,
-                                 {'CORS': config.CORS},
+                                 {'middlewares': config.middlewares},
                                  config.logger_config_path,
                                  config.services,
-                                 config.sessions_manager, lp_is_ssl,
-                                 lp_bind_addr, is_unixsocket, config.static_path])
+                                 lp_is_ssl,
+                                 lp_bind_addr, is_unixsocket,
+                                 config.static_path])
 
         cor = s_mgmt.start(config.python_exec,
                            os.path.join(bin_dir, 'leela-worker'),
                            '{}-{}'.format(proj_name, i),
-                           env=env, input_s=params_str,
-                           need_stdout = not config.need_daemonize)
-
-        loop.run_until_complete(cor)
-        leela_processes.append(s_mgmt)
-
-
-    for act in config.activities:
-        s_mgmt = ServiceMgmt(config.username)
-        params_str = json.dumps(['activity', home_path,
-                                 config.logger_config_path,
-                                 act['act_endpoint'], act['act_config']])
-        cor = s_mgmt.start(config.python_exec,
-                           os.path.join(bin_dir, 'leela-worker'),
-                           '{}-act-{}'.format(proj_name, act['act_endpoint']),
                            env=env, input_s=params_str,
                            need_stdout = not config.need_daemonize)
 

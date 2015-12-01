@@ -8,13 +8,14 @@ import asyncio
 import signal
 import json
 import functools
+import copy
 
 from leela.core.application import Application
 from leela.utils.logger import logger
 
 
 def main(name, project_home, conf, logger_config_file, services,
-         sessions_mgr_path, is_ssl, bind_addr, is_unixsocket, static_path):
+         is_ssl, bind_addr, is_unixsocket, static_path):
 
     sys.path.append(os.path.join(project_home, 'services'))
 
@@ -23,53 +24,44 @@ def main(name, project_home, conf, logger_config_file, services,
 
     logger.info('[{}] starting service...'.format(name))
 
-    app.set_http_config(conf.get('http', {}))
-    app.set_cors_config(conf.get('CORS', {}))
-    try:
-        for service in services:
-            future = app.init_service(service['srv_endpoint'],
-                                      service['srv_config'])
-            loop.run_until_complete(future)
+    mw_configs = conf.get('middlewares', []))
+    mw_list = []
+    for mw_config in mw_configs:
+        mw = loop.run_until_complete(app.init_middleware(mw_config))
+        mw_list.append(mw)
 
-        if not static_path:
-            static_path = os.path.join(project_home, 'www')
-        app.handle_static(static_path)
+    for service in services:
+        service_mw_list = copy.copy(mw_list)
+        for mw_config in service.get('srv_middlewares', []):
+            mw = loop.run_until_complete(app.init_middleware(mw_config))
+            service_mw_list.append(mw)
 
-        if sessions_mgr_path:
-            app.setup_sessions_manager(sessions_mgr_path)
+        future = app.init_service(service['srv_endpoint'],
+                                  service['srv_config'],
+                                  service_mw_list)
+        loop.run_until_complete(future)
 
-        if is_unixsocket:
-            app.make_unix_server(bind_addr)
-        else:
-            parts = bind_addr.split(':')
-            parts.append(80)
-            host, port = parts[:2]
-            app.make_tcp_server(host, port)
-            bind_addr = '{}://{}:{}'.format('https' if is_ssl else 'http',
-                                            host, port)
+    if not static_path:
+        static_path = os.path.join(project_home, 'www')
+    app.handle_static(static_path)
 
-        logger.info('[{}] service started at {}'.format(name, bind_addr))
+    if is_unixsocket:
+        app.make_unix_server(bind_addr)
+    else:
+        parts = bind_addr.split(':')
+        parts.append(80)
+        host, port = parts[:2]
+        app.make_tcp_server(host, port)
+        bind_addr = '{}://{}:{}'.format('https' if is_ssl else 'http',
+                                        host, port)
 
-        try:
-            loop.run_forever()
-        except KeyboardInterrupt:
-            pass
-    finally:
-        pass
+    logger.info('[{}] service started at {}'.format(name, bind_addr))
 
-def main_activity(name, project_home, logger_config_file,
-                  act_endpoint, act_config):
-    sys.path.append(os.path.join(project_home, 'activities'))
-    if logger_config_file != '--noconf':
-        app.set_logger_config(logger_config_file)
-
-    logger.info('[{}] starting activity {}...'.format(name, act_endpoint))
-    future = app.init_activity(act_endpoint, act_config)
-    loop.run_until_complete(future)
     try:
         loop.run_forever()
     except KeyboardInterrupt:
         pass
+
 
 @asyncio.coroutine
 def stop(s='', n=''):
@@ -106,9 +98,7 @@ if __name__ == '__main__':
         mode = args.pop(0)
         if mode == 'services':
             main(name, args[0], args[1], args[2],
-                 args[3], args[4], args[5], args[6], args[7], args[8])
-        elif mode == 'activity':
-            main_activity(name, args[0], args[1], args[2], args[3])
+                 args[3], args[4], args[5], args[6], args[7])
         else:
             raise Exception('Unknown leela-worker mode!')
     except Exception as err:

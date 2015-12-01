@@ -11,19 +11,28 @@ class LeelaConfig(object):
 
     def parse(self, config):
         self.__check_param(config, 'leela')
+        self.__check_param(config, 'services')
+        services_cfg = config['services']
 
-        self.__config['CORS'] = config.get('CORS', {})
+        srv_mws = config.get('middlewares', [])
+        if type(srv_mws) != list:
+            raise ValueError('Middlewares must be declared in list')
+        expanded_srv_mws = []
+        for mw in srv_mws:
+            expanded_mw = self.__parse_cf_params(mw)
+            expanded_srv_mws.append(expanded_mw)
+        self.__config['middlewares'] = expanded_srv_mws
+
         config = config['leela']
 
-        self.__check_param(config, 'bind_address')
-        self.__check_param(config, 'services')
+        self.__check_param(config, 'bind_address', 'leela')
 
         self.__config['bind_address'] = self.__gv(config, 'bind_address')
         self.__config['bind_port'] = self.__gv(config, 'bind_port', 80, int)
         self.__config['monitor_changes'] = self.__gv(config,
                                                      'monitor_changes',
                                                      False, bool)
-        self.__config['leela_proc_count'] = self.__gv(config, 
+        self.__config['leela_proc_count'] = self.__gv(config,
                                                       'leela_proc_count',
                                                       -1, int)
         def_proxy = self.__config['leela_proc_count'] != 1
@@ -37,31 +46,30 @@ class LeelaConfig(object):
         self.__config['logger_config_path'] = os.path.join(self.__project_path,
                                                            'config',
                                                            logger_config)
-        self.__config['static_path'] = self.__gv(config, 'static_path')
+        static_path = self.__gv(config, 'static_path', 'www')
+        self.__config['static_path'] = os.path.join(self.__project_path,
+                                                    static_path)
 
-        services_cfg = config['services']
         services = []
+        if not services_cfg:
+            raise ValueError('No one service found in config file')
         for s_config in services_cfg:
-            self.__check_param(s_config, 'endpoint')
+            self.__check_param(s_config, 'endpoint', 'services')
             raw_srv_config = s_config.get('config', {})
-            srv_config = {}
-            for param in raw_srv_config:
-                srv_config[param] = self.__gv(raw_srv_config, param)
-            services.append({'srv_endpoint': s_config['endpoint'],
-                             'srv_config': srv_config })
-        self.__config['services'] = services
+            srv_config = self.__parse_cf_params(raw_srv_config)
 
-        activities_cfg = config.get('activities', [])
-        activities = []
-        for a_config in activities_cfg:
-            self.__check_param(a_config, 'endpoint')
-            raw_act_config = a_config.get('config', {})
-            act_config = {}
-            for param in raw_act_config:
-                act_config[param] = self.__gv(raw_act_config, param)
-            activities.append({'act_endpoint': a_config['endpoint'],
-                               'act_config': act_config})
-        self.__config['activities'] = activities
+            srv_mws = s_config.get('middlewares', [])
+            if type(srv_mws) != list:
+                raise ValueError('Middlewares must be declared in list')
+            expanded_srv_mws = []
+            for mw in srv_mws:
+                expanded_mw = self.__parse_cf_params(mw)
+                expanded_srv_mws.append(expanded_mw)
+
+            services.append({'srv_endpoint': s_config['endpoint'],
+                             'srv_config': srv_config,
+                             'srv_middlewares': expanded_srv_mws})
+        self.__config['services'] = services
 
         self.__config['python_exec'] = self.__gv(config, 'python_exec',
                                                   sys.executable or 'python3')
@@ -69,17 +77,14 @@ class LeelaConfig(object):
         self.__config['nginx_exec'] = self.__gv(config, 'nginx_exec',
                                                  '/usr/sbin/nginx')
 
-        s_mgr = config.get('sessions_manager', {})
-        self.__config['sessions_manager'] = s_mgr.get('endpoint', None)
-
         ssl_config = config.get('ssl', None)
         self.__config['ssl'] = bool(ssl_config)
         self.__config['ssl_cert'] = None
         self.__config['ssl_key'] = None
         self.__config['ssl_only'] = False
         if ssl_config:
-            self.__check_param(ssl_config, 'cert')
-            self.__check_param(ssl_config, 'key')
+            self.__check_param(ssl_config, 'cert', 'leela')
+            self.__check_param(ssl_config, 'key', 'leela')
             self.__config['ssl_cert'] = os.path.join(self.__project_path,
                                                      'config',
                                                      self.__gv(ssl_config,
@@ -92,10 +97,15 @@ class LeelaConfig(object):
                                                   False, bool)
 
 
-    def __check_param(self, config, param):
+    def __check_param(self, config, param, parent=None):
+        if not parent:
+            parent = ''
+        else:
+            parent += '.'
+
         if type(config) != dict or param not in config:
-            raise ValueError('<{}> scope is expected in YAML file.'
-                             .format(param))
+            raise ValueError('<{}{}> does not found in YAML file'
+                             .format(parent, param))
 
     def __check_type(self, param, val, rtype):
         if type(val) != rtype:
@@ -106,6 +116,28 @@ class LeelaConfig(object):
                              '(but "{}" found)'
                              .format(param, rtype.__name__, val))
         return val
+
+    def __parse_cf_params(self, config):
+        parsed_dict = {}
+        for key, value in config.items():
+            if type(value) == str:
+                parsed_dict[key] = self.__gv(config, key)
+            elif type(value) == list:
+                r_list = []
+                for item in value:
+                    if type(item) == str:
+                        r_list.append(self.__gv({'key': item}, 'key'))
+                    elif type(item) == dict:
+                        r_list.append(self.__parse_cf_params(item))
+                    else:
+                        r_list.append(item)
+                parsed_dict[key] = r_list
+            elif type(value) == dict:
+                parsed_dict[key] = self.__parse_cf_params(value)
+            else:
+                parsed_dict[key] = value
+
+        return parsed_dict
 
     def __gv(self, config, param, default=None, ret_type=None):
         '''get value of config param

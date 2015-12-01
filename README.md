@@ -109,17 +109,12 @@ Configuration file format
         services:
             - endpoint: <service endpoint - python module path>
               *config: <configuration dictionary ({} by default)
+	      *middlewares: <list of service middlewares>
             ...
 
-        *activities:
-            - endpoint: <activity endpoint - python module path>
-              *config: <configuration dictionary ({} by default)
-            ...
-            
-
-        *sessions_manager:*
-            endpoint: <sessions manager endpoint - python module path>
-
+    *middlewares:
+	- endpoint: <middleware class endpoint>
+	  *config: <configuration dictionary ({} by default)>
 
     *CORS:
         - *url_regex: <URL regexp for CORS apply>
@@ -133,7 +128,7 @@ Configuration file format
 Parameters that marked as '\*' are optional.
 
 
-Values of parameters in *leela* section of configuration file can be environment variables.
+Values of parameters in configuration file can be environment variables.
 For example:
 
     test0: $TEST_ENV_VAR

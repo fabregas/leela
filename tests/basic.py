@@ -5,124 +5,16 @@ import unittest
 import json
 import sys
 import os
-from datetime import datetime
 
-sys.path.append(os.path.abspath('.'))
+sys.path.insert(0, os.path.abspath('.'))
 
 from leela.core import *
-from leela.db_support.inmemory import InMemoryDatabase
-from leela.db_support.mongo import MongoDB as InMemoryDatabase
-from leela.utils.test_utils import TestLeelaServer
-
-
-class A(AService):
-    @classmethod
-    @asyncio.coroutine
-    def initialize(cls, configuration):
-        return cls(None, configuration.get('a', 0))
-
-    def __init__(self, db, a):
-        super().__init__(db)
-        self.__a = a
-        self.__incoming = {}
-
-    @reg_get('test_path')
-    def test(self, data, http_req):
-        print('test func ...', data)
-        ret = ['test sting', 1, self.__a]
-        if data:
-            ret.append(data)
-        return ret
-
-    @reg_post('incoming')
-    def test2(self, data, http_req):
-        print('POST test func ...', dict(data))
-        self.__incoming.update(dict(data))
-        return True
-
-    @reg_get('incoming')
-    def test3(self, data, http_req):
-        return self.__incoming
-
-    @reg_put('incoming')
-    def test2_put(self, data, http_req):
-        print('PUT test func ...', data)
-        self.__incoming[data.key] = data.value
-        return True
-
-    @reg_delete('incoming')
-    def test2_delete(self, data, http_req):
-        print('DELETE test func ...', data)
-        del self.__incoming[data.key]
-        return True
-
-class B(A):
-    FNAME = None
-    FCONT = None
-    @classmethod
-    @asyncio.coroutine
-    def initialize(cls, config):
-        return cls(DB, config.get('a', 2222), 4444)
-
-    def __init__(self, db, a, b):
-        super().__init__(db, a)
-        self.__b = b
-
-
-    @reg_get('test_path2')
-    def test22(self, data, http_req):
-        ret = yield from self.test(data, http_req)
-        print('test22 func ...', data, ret)
-        return ['test sting', 22, self.__b]
-
-    @reg_get('secret', need_auth)
-    def test_secret(self, data, http_req):
-        return 'SECRET'
-
-    @reg_get('top_secret', authorization('testrole', 'superrole'))
-    def test_topsecret(self, data, http_req):
-        return 'TOP SECRET'
-
-    @reg_get('super_secret', authorization('superrole'))
-    def test_supersecret(self, data, http_req):
-        return 'SUPER SECRET'
-
-    @reg_postfile('some_file')
-    def test_upload(self, data, http_req):
-        t0 = datetime.now()
-
-        self.__class__.FNAME = data.file.filename
-        self.__class__.FCONT = data.file.file.read()
-        data.file.file.close()
-
-        print('some_file proc time: %s'%(datetime.now()-t0))
-
-    @reg_uploadstream('some_str_file')
-    def test_uploadstr(self, data, http_req):
-        t0 = datetime.now()
-
-        h = hashlib.sha1()
-        while True:
-            chunk = yield from data.stream.readany()
-            if not chunk:
-                break
-            h.update(chunk)
-        self.__class__.STREAM_SHA1 = h.hexdigest()
-
-        print('some_str_file proc time: %s'%(datetime.now()-t0))
-
 
 loop = asyncio.get_event_loop()
-DB = InMemoryDatabase('leela_test')
-conn = DB.connect()
-loop.run_until_complete(conn)
-loop.run_until_complete(DB.drop_database())
-
 app = Application()
-loop.run_until_complete(app.init_service_class(B, {}))
+future = app.init_service('tests.services.B', {'a': 2222, 'b': 4444}, [])
+loop.run_until_complete(future)
 app.handle_static('.')
-#SM = app.setup_sessions_manager('leela.core.sessions.InMemorySessionsManager')
-SM = app.setup_sessions_manager('leela.db_support.mongo.MongoSessionsManager')
 srv = app.make_tcp_server('127.0.0.1', 6666)
 
 def async_test(f):
@@ -182,7 +74,7 @@ class TestBasicAPI(unittest.TestCase):
         yield from r.release()
 
         r = yield from aiohttp.get('http://0.0.0.0:6666/api/test_path')
-        self.assertEqual(r.status, 200)
+        self.assertEqual(r.status, 200, r.reason)
         data = yield from r.json()
         self.assertEqual(len(data), 3)
         self.assertEqual(data, ['test sting', 1, 2222])
@@ -202,104 +94,22 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(data, ['test sting', 22, 4444])
 
     @async_test
-    def test_auth(self):
-        r = yield from aiohttp.get('http://0.0.0.0:6666/api/secret')
-        self.assertEqual(r.status, 401)
-        yield from r.release()
-
-        r = yield from aiohttp.post('http://0.0.0.0:6666/api/__auth__')
-        self.assertEqual(r.status, 400)
-        print (r.reason)
-        yield from r.release()
-
-        r = yield from aiohttp.post(
-            'http://0.0.0.0:6666/api/__auth__',
-            data=json.dumps({'username': 'kst', 'password': '123'}))
-        self.assertEqual(r.status, 401, r.reason)
-        self.assertEqual(r.reason, 'User does not found')
-        yield from r.release()
-
-        user = User.create('kst', '123', ['testrole'])
-        yield from user.save()
-
-        r = yield from aiohttp.post(
-            'http://0.0.0.0:6666/api/__auth__',
-            data=json.dumps({'username': 'kstt', 'password': '123'}))
-        self.assertEqual(r.status, 401, r.reason)
-        yield from r.release()
-
-        r = yield from aiohttp.post(
-            'http://0.0.0.0:6666/api/__auth__',
-            data=json.dumps({'username': 'kst', 'password': '1223'}))
-        self.assertEqual(r.status, 401, r.reason)
-        yield from r.release()
-
-        r = yield from aiohttp.post(
-            'http://0.0.0.0:6666/api/__auth__',
-            data=json.dumps({'username': 'kst', 'password': '123'}))
-        self.assertEqual(r.status, 200, r.reason)
-        cookies = r.cookies
-        print('COOKIES 1:', r.cookies)
-        yield from r.release()
-
-        r = yield from aiohttp.get('http://0.0.0.0:6666/api/secret')
-        self.assertEqual(r.status, 401)
-        yield from r.release()
-
-        r = yield from aiohttp.get('http://0.0.0.0:6666/api/secret',
-                                   cookies=cookies)
-        self.assertEqual(r.status, 200, r.reason)
-        yield from r.release()
-        count = yield from SM.count()
-        self.assertEqual(int(count), 1)
-
-
-        r = yield from aiohttp.get('http://0.0.0.0:6666/api/top_secret',
-                                   cookies=cookies)
-        self.assertEqual(r.status, 200, r.reason)
-        yield from r.release()
-
-        r = yield from aiohttp.get('http://0.0.0.0:6666/api/super_secret',
-                                   cookies=cookies)
-        self.assertEqual(r.status, 401, r.reason)
-        self.assertEqual(r.reason, 'Permission denied')
-        yield from r.release()
-
-        r = yield from aiohttp.post(
-            'http://0.0.0.0:6666/api/__auth__',
-            data=json.dumps({'username': 'kst', 'password': '123'}))
-        self.assertEqual(r.status, 200, r.reason)
-        yield from r.release()
-        cookies = r.cookies
-        print('COOKIES 2:', r.cookies)
-        count = yield from SM.count()
-        self.assertEqual(int(count), 2)
-
-        r = yield from aiohttp.post('http://0.0.0.0:6666/api/__logout__')
-        self.assertEqual(r.status, 401, r.reason)
-        yield from r.release()
-
-        r = yield from aiohttp.post('http://0.0.0.0:6666/api/__logout__',
-                                    cookies=cookies)
-        self.assertEqual(r.status, 200, r.reason)
-        yield from r.release()
-        count = yield from SM.count()
-        self.assertEqual(int(count), 1)
-
-
-    @async_test
     def test_fileupload(self):
         with open(__file__, 'rb') as fdesc:
             files = {'file': fdesc}
             r = yield from aiohttp.post('http://0.0.0.0:6666/api/some_file',
                                         data=files)
             data = yield from r.read()
-
         self.assertEqual(r.status, 200, data)
 
-        self.assertEqual(B.FNAME, 'basic.py')
+        r = yield from aiohttp.get('http://0.0.0.0:6666/api/some_file')
+        data = yield from r.read()
+        self.assertEqual(r.status, 200, data)
+        data = yield from r.json()
+
+        self.assertEqual(data[0], 'basic.py')
         with open(__file__, 'rb') as rfile:
-            self.assertEqual(B.FCONT, rfile.read())
+            self.assertEqual(data[1], rfile.read().decode())
 
 
         with open(__file__, 'rb') as fdesc:
@@ -309,10 +119,13 @@ class TestBasicAPI(unittest.TestCase):
         self.assertEqual(r.status, 200)
         yield from r.release()
 
-        self.assertEqual(B.FNAME, 'basic.py')
+        r = yield from aiohttp.get('http://0.0.0.0:6666/api/some_file')
+        self.assertEqual(r.status, 200)
+        data = yield from r.json()
+
+        self.assertEqual(data[0], 'basic.py')
         with open(__file__, 'rb') as rfile:
-            self.assertEqual(B.STREAM_SHA1,
-                             hashlib.sha1(rfile.read()).hexdigest())
+            self.assertEqual(data[2], hashlib.sha1(rfile.read()).hexdigest())
 
 
 
