@@ -24,7 +24,7 @@ def main(name, project_home, conf, logger_config_file, services,
 
     logger.info('[{}] starting service...'.format(name))
 
-    mw_configs = conf.get('middlewares', []))
+    mw_configs = conf.get('middlewares', [])
     mw_list = []
     for mw_config in mw_configs:
         mw = loop.run_until_complete(app.init_middleware(mw_config))

@@ -22,12 +22,3 @@ Feature: Leela mgmt daemon
         And get "/" with code "200"
         And contain "Available methods:" in "/api/__introspect__" body
         And contain header "Access-Control-Allow-Origin" in "/api/__introspect__"
-
-    Scenario: Activity test
-        Given I create leela project "test_proj_4"
-        When I start leela with "test-act" config as "user"
-        Then I see leela nodaemon
-        And I see "2" leela worker binded on "tcp" socket
-        And get "/" with code "200"
-        And contain "Available methods:" in "/api/__introspect__" body
-

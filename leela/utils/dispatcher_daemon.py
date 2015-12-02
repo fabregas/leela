@@ -17,6 +17,11 @@ from .logger import logger
 from .daemon3x import daemon as Daemon
 
 
+RC_OK = 0
+RC_ERR = 1
+RC_NEEDRELOAD = 2
+RC_NEEDREBUILD = 3
+
 NGINX_CFG_TMPL = '''
 worker_processes 1;
 daemon off;
@@ -218,7 +223,14 @@ class ServiceMgmt:
             return
 
         self.__proc.send_signal(signal.SIGINT)
-        ret = yield from self.__proc.wait()
+        for _ in range(30):
+            if self.__proc.returncode is None:
+                break
+            try:
+                ret = yield from asyncio.wait_for(self.__proc.communicate(), 1)
+                break
+            except asyncio.TimeoutError:
+                pass
 
         self.__proc = None
 
@@ -287,35 +299,43 @@ def _run_nginx(loop, home_path, proj_name, config,
 def _stop_processes(loop, leela_processes):
     cors = []
     for proc in leela_processes:
-        try:
-            cors.append(proc.stop())
-        except ProcessLookupError as err:
-            logger.error('ProcessLookupError: {}'.format(err))
-        except Exception as err:
-            logger.error('proc.stop() faied: {}'.format(err))
+        cors.append(proc.stop())
 
-    for cor in cors:
-        try:
-            loop.run_until_complete(cor)
-        except ProcessLookupError as err:
-            logger.error('ProcessLookupError: {}'.format(err))
-        except Exception as err:
-            logger.error('proc.stop() faied: {}'.format(err))
+    try:
+        done, pending = loop.run_until_complete(
+            asyncio.wait(cors, timeout=30))
+        if pending:
+            logger.error('Something wrong! '
+                         'Some leela processes does not stopped')
+    except ProcessLookupError as err:
+        logger.error('ProcessLookupError: {}'.format(err))
+    except Exception as err:
+        logger.error('proc.stop() faied: {}'.format(err))
 
 
 @asyncio.coroutine
-def _check_changes(path):
+def _check_changes(pypath, wwwpath):
     cur_time = time.time()
     print('cur time: ', cur_time)
     while True:
-        for cur_path, _, files in os.walk(path):
+        for cur_path, _, files in os.walk(pypath):
             for file_name in files:
                 f_path = os.path.join(cur_path, file_name)
                 if not f_path.endswith('.py'):
                     continue
                 if os.path.getmtime(f_path) > cur_time:
                     print('detected changed file at {}...'.format(f_path))
-                    return f_path
+                    return RC_NEEDRELOAD
+
+        for cur_path, _, files in os.walk(wwwpath):
+            for file_name in files:
+                f_path = os.path.join(cur_path, file_name)
+                if f_path.endswith('.html'):
+                    continue
+                if os.path.getmtime(f_path) > cur_time:
+                    print('detected changed file at {}...'.format(f_path))
+                    return RC_NEEDREBUILD
+
         yield from asyncio.sleep(1)
 
 
@@ -342,7 +362,6 @@ def start(bin_dir, home_path, config, *, loop):
         daemon = Daemon('/tmp/leela-{}.pid'.format(proj_name))
         daemon.start()
 
-    # with daemon context
     leela_processes = []
     bind_sockets = []
     try:
@@ -359,11 +378,13 @@ def start(bin_dir, home_path, config, *, loop):
         _stop_processes(loop, leela_processes)
         return
 
-    retcode = 1
+    logger.info('started leela dispatcher')
+    retcode = RC_ERR
     try:
         if config.monitor_changes:
-            cor = _check_changes(os.path.join(home_path, 'services'))
-            loop.run_until_complete(cor)
+            cor = _check_changes(os.path.join(home_path, 'services'),
+                                 os.path.join(home_path, 'www'))
+            retcode = loop.run_until_complete(cor)
         else:
             tasks = []
             for proc in leela_processes:
@@ -373,9 +394,15 @@ def start(bin_dir, home_path, config, *, loop):
             for task in tasks:
                 loop.run_until_complete(task)
     except KeyboardInterrupt:
-        retcode = 0
+        retcode = RC_OK
 
-    _stop_processes(loop, leela_processes)
+    logger.info('stopping leela dispatcher...')
+    try:
+        _stop_processes(loop, leela_processes)
+    except Exception as err:
+        logger.error('leela processes does not stopped: %s', err)
+    finally:
+        logger.info('leela dispatcher stopped')
 
     print('Done.')
     return retcode

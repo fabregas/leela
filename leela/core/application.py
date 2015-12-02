@@ -37,9 +37,9 @@ class Application(object):
 
         try:
             module = importlib.import_module('.'.join(parts))
-        except ImportError:
+        except ImportError as err:
             raise RuntimeError(
-                'Class "{}" does not found!'.format(class_endpoint))
+                'Class "{}" does not found: {}'.format(class_endpoint, err))
 
         class_o = getattr(module, class_name, None)
         if class_o is None:
