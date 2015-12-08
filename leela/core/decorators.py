@@ -10,16 +10,37 @@ from aiohttp import web
 from leela.utils.logger import logger
 
 
-class UserData(dict):
+class SmartDict(dict):
     def __init__(self):
         super().__init__()
+
+    def from_dict(self, dict_val):
+        for key, value in dict_val.items():
+            self[key] = value
+
+    def __getattr__(self, attr):
+        return self[attr]
+
+    def __setattr__(self, attr, value):
+        raise ValueError('Request should not be modified')
+
+
+class SmartRequest:
+    __slots__ = ('session', 'data', 'query', 'params', 'websocket')
+
+    def __init__(self):
         self.session = None
+        self.websocket = None
+        self.query = SmartDict()
+        self.params = SmartDict()
+        self.data = SmartDict()
 
     def set_session(self, session):
         self.session = session
 
-    def __getattr__(self, attr):
-        return self[attr]
+    def __repr__(self):
+        return '<SmartRequest query={}, params={}, data={}>'.format(
+            self.query, self.params, self.data)
 
 
 class leela_api(object):
@@ -43,7 +64,19 @@ class leela_api(object):
     @classmethod
     @asyncio.coroutine
     def _parse_request(cls, request):
-        return UserData()
+        ret = SmartRequest()
+
+        ret.params.from_dict(request.match_info)
+        ret.query.from_dict(request.GET)
+
+        data = yield from request.content.read()
+        if data:
+            data = json.loads(data.decode())
+        else:
+            data = {}
+
+        ret.data.from_dict(data)
+        return ret
 
     @classmethod
     def _form_response(cls, ret_object):
@@ -131,22 +164,12 @@ class leela_api(object):
             cls._decorate_method(service, method)
 
 
+class leela_get(leela_api):
+    http_method = 'GET'
+
+
 class leela_post(leela_api):
     http_method = 'POST'
-
-    @classmethod
-    @asyncio.coroutine
-    def _parse_request(cls, request):
-        data = yield from request.content.read()
-        if data:
-            data = json.loads(data.decode())
-        else:
-            data = {}
-
-        ret = UserData()
-        for key in iter(data):
-            ret[key] = data.get(key)
-        return ret
 
 
 class leela_put(leela_post):
@@ -163,11 +186,13 @@ class leela_form_post(leela_api):
     @classmethod
     @asyncio.coroutine
     def _parse_request(cls, request):
-        data = yield from request.post()
+        ret = SmartRequest()
 
-        ret = UserData()
-        for key in iter(data):
-            ret[key] = data.get(key)
+        ret.params.from_dict(request.match_info)
+        ret.query.from_dict(request.GET)
+
+        data = yield from request.post()
+        ret.data.from_dict(data)
         return ret
 
 
@@ -175,18 +200,6 @@ class leela_postfile(leela_form_post):
     @classmethod
     def _form_response(cls, ret_object):
         return web.Response()
-
-
-class leela_get(leela_api):
-    http_method = 'GET'
-
-    @classmethod
-    @asyncio.coroutine
-    def _parse_request(cls, request):
-        ret = UserData()
-        for key in iter(request.GET):
-            ret[key] = request.GET.get(key)
-        return ret
 
 
 class leela_websocket(leela_get):
@@ -215,10 +228,10 @@ class leela_uploadstream(leela_post):
     @classmethod
     @asyncio.coroutine
     def _parse_request(cls, request):
-        ret = UserData()
-        for key in iter(request.GET):
-            ret[key] = request.GET.get(key)
-        ret['stream'] = request.content
+        ret = SmartRequest()
+        ret.params.from_dict(request.match_info)
+        ret.query.from_dict(request.GET)
+        ret.data['stream'] = request.content
         return ret
 
     @classmethod

@@ -67,7 +67,8 @@ class TestAuthAPI(unittest.TestCase):
         r = yield from aiohttp.post(
             'http://0.0.0.0:6666/api/__auth__',
             data=json.dumps({'username': 'kst', 'password': '123'}))
-        self.assertEqual(r.status, 200, r.reason)
+        data = yield from r.read()
+        self.assertEqual(r.status, 200, data)
         cookies = r.cookies
         print('COOKIES 1:', r.cookies)
         yield from r.release()

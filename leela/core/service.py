@@ -35,7 +35,7 @@ class LeelaService(object):
                     .format(key))
 
     @leela_get('__introspect__')
-    def util_introspect_methods(self, data):
+    def util_introspect_methods(self, req):
         li_list = ''
         for method, path, _, docs, _ in leela_api.get_routes():
             if path.startswith('/api/__'):

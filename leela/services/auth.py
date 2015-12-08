@@ -47,27 +47,27 @@ class AuthBasedService(LeelaService):
         raise RuntimeError('not implemented')
 
     @leela_post('__auth__')
-    def util_auth(self, data):
-        self.mandatory_check(data, 'username', 'password')
+    def util_auth(self, req):
+        self.mandatory_check(req.data, 'username', 'password')
 
-        user = yield from self.get_user(data.username)
+        user = yield from self.get_user(req.data.username)
 
         if not user:
             raise web.HTTPUnauthorized(reason='User does not found')
 
-        if not user.check_password(data.password):
+        if not user.check_password(req.data.password):
             raise web.HTTPUnauthorized(reason='Invalid password')
 
-        data.session.set(SESSION_USER_KEY, user)
+        req.session.set(SESSION_USER_KEY, user)
 
         return {'username': user.username,
                 'roles': user.roles,
                 'additional': user.additional_info}
 
     @leela_post('__logout__', auth=need_auth)
-    def util_logout(self, data):
-        if data.get('clear_session', True):
-            data.session.remove()
+    def util_logout(self, req):
+        if req.data.get('clear_session', True):
+            req.session.remove()
         else:
-            data.session.set(SESSION_USER_KEY, None)
+            req.session.set(SESSION_USER_KEY, None)
         return web.Response()
