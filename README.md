@@ -1,7 +1,5 @@
 <p align="center">
-  <a href="http://gulpjs.com">
     <img height="256" width="256" src="http://findicons.com/files/icons/1316/futurama_vol_1/256/leela.png">
-  </a>
 </p>
 
 # Leela
