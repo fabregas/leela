@@ -13,9 +13,9 @@ class LeelaMiddleware(object):
         pass
 
     @asyncio.coroutine
-    def on_request(self, request, data, params):
+    def on_request(self, request, data, params, cache):
         return None
 
     @asyncio.coroutine
-    def on_response(self, request, data, response, params):
+    def on_response(self, request, data, response, params, cache):
         return response

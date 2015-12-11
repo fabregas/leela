@@ -24,13 +24,13 @@ class SessionMiddleware(LeelaMiddleware):
         yield from self.session_manager.destroy()
 
     @asyncio.coroutine
-    def on_request(self, request, data, params):
+    def on_request(self, request, data, params, cache):
         session_id = request.cookies.get(COOKIE_SESSION_ID, None)
         session = yield from self.session_manager.get(session_id)
         data.set_session(session)
 
     @asyncio.coroutine
-    def on_response(self, request, data, response, params):
+    def on_response(self, request, data, response, params, cache):
         if not data.session:
             return response
 

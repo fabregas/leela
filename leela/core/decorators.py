@@ -102,9 +102,10 @@ class leela_api(object):
 
                 #FIXME req validation
 
+                mw_cache = {}
                 for middleware in service.middlewares():
                     resp = yield from middleware.on_request(
-                        request, data, method._l_api.mw_params)
+                        request, data, method._l_api.mw_params, mw_cache)
                     if resp:
                         assert isinstance(resp, web.Response), \
                             'Middleware {} returns invalid response: {}' \
@@ -119,7 +120,7 @@ class leela_api(object):
 
                 for middleware in service.middlewares():
                     resp = yield from middleware.on_response(
-                        request, data, resp, method._l_api.mw_params)
+                        request, data, resp, method._l_api.mw_params, mw_cache)
             except web.HTTPException as ex:
                 resp = ex
             except Exception as ex:
@@ -131,7 +132,8 @@ class leela_api(object):
             resp = web.Response()
             for middleware in service.middlewares():
                 resp = middleware.on_response(
-                    request, resp, method._l_api.mw_params)
+                    request, SmartRequest(), resp,
+                    method._l_api.mw_params, {})
             return resp
 
 

@@ -103,3 +103,17 @@ class B(A, AuthBasedService):
         self.__class__.STREAM_SHA1 = h.hexdigest()
 
         print('some_str_file proc time: %s'%(datetime.now()-t0))
+
+
+class CorsTest(LeelaService):
+    @leela_get('allallow')
+    def test_all_allow(self, req):
+        return 'ALL ALLOW'
+
+    @leela_get('readonly')
+    def test_readonly(self, req):
+        return 'ALL ALLOW'
+
+    @leela_post('echo')
+    def test_echo(self, req):
+        return req.data

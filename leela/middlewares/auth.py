@@ -7,7 +7,7 @@ from leela.services.auth import SESSION_USER_KEY, authorization
 
 class AuthMiddleware(LeelaMiddleware):
     @asyncio.coroutine
-    def on_request(self, request, data, params):
+    def on_request(self, request, data, params, cache):
         auth_req = params.get('auth', None)
         if not auth_req:
             return
@@ -27,5 +27,5 @@ class AuthMiddleware(LeelaMiddleware):
                 raise web.HTTPUnauthorized(reason='Permission denied')
 
     @asyncio.coroutine
-    def on_response(self, request, data, response, params):
+    def on_response(self, request, data, response, params, cache):
         return response
