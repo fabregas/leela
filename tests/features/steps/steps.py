@@ -20,8 +20,7 @@ def call_leela(*args):
     s_args = ['python3', leela_bin]
     env = copy.copy(os.environ)
     env['PYTHONPATH'] = base_dir
-    proc = Popen(s_args + list(args), stdout=PIPE, stderr=PIPE,
-                  env=env)
+    proc = Popen(s_args + list(args), stdout=PIPE, stderr=PIPE, env=env)
     return proc
 
 def sudo_call_leela(*args):
@@ -47,17 +46,12 @@ def step_impl(context, proj_name):
         print(err.decode())
         raise RuntimeError('leela new-project failed!')
 
-    ret = os.system('cp %s %s/'%(os.path.join(test_data_dir, 'test-act.yaml'),
-                          os.path.join(work_dir, 'config')))
+    context.work_dir = work_dir
 
-    os.system('mkdir %s/activities'%work_dir)
-    os.system('cp %s %s/activities'%(os.path.join(test_data_dir, 'activity.py'),
-                                     work_dir))
-
-    context.work_dir = work_dir 
 
 @when(u'I start leela with "{config_name}" config as "{user}"')
 def step_impl(context, config_name, user):
+    config_name = os.path.join(test_data_dir, config_name + '.yaml')
     if user == 'superuser':
         sudo_call_leela('start', config_name, context.work_dir)
         context.for_clean.append(lambda: sudo_call_leela('stop', context.work_dir))
@@ -84,16 +78,17 @@ def step_impl(context):
 def step_impl(context):
     time.sleep(.5)
 
-    ps_out = call_cmd('ps aux | grep "leela start"') 
+    ps_out = call_cmd('ps aux | grep "leela start"')
     count = len(ps_out.decode().split('\n')) - 3
     #print('=========', ps_out, count)
     assert count == 1, 'processes found - {}'.format(count)
+
 
 @then(u'I see "{workers_count}" leela worker binded on "{socket_type}" socket')
 def step_impl(context, workers_count, socket_type):
     if workers_count == 'cpu_count':
         workers_count = 2*multiprocessing.cpu_count()
-    ps_out = call_cmd('ps aux | grep leela-worker') 
+    ps_out = call_cmd('ps aux | grep leela-worker')
     count = len(ps_out.decode().split('\n')) - 3
     #print('=========', ps_out, count)
     assert count == int(workers_count), 'processes found - {}'.format(count)

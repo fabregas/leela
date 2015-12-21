@@ -1,0 +1,39 @@
+
+leela:
+    bind_address: 0.0.0.0
+    bind_port: 8080
+    monitor_changes: true
+    leela_proc_count: 2
+    logger_config: /test/my_logger.yaml
+    need_daemonize: false
+    user: testuser
+    static_path: /my/custom/path
+    nginx_proxy: true
+    nginx_exec: /bin/nginx
+    python_exec: /bin/python3
+
+middlewares:
+    - endpoint: test.path.SomeMWClass
+      test_list: [4, 2, 2]
+    - endpoint: test.other.OtherMWClass
+      test_env: $TEST_ENV_VAR || 'test value if not found'
+
+services:
+    - endpoint: test.com.service.TestService
+      config:
+         test_int: 23
+         test_str: this is string
+         test_list: [33, 'test message', {'test': 90}]
+         test_dict:
+             a: $HOME || '/root'
+             b: ok, thats all...
+      middlewares:
+         - endpoint: some.middleware.path.MWClass
+           some_param:
+               key: value
+               env_k: $SOME_UNDEFINED || null
+           other_param: 42344.42
+
+    - endpoint: test.other.service.TestService
+      config:
+          test: test value

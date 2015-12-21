@@ -1,0 +1,14 @@
+leela:
+    bind_address: 0.0.0.0
+    bind_port: 8080
+    leela_proc_count: -1
+    logger_config: logger-production.yaml
+    nginx_proxy: true
+    nginx_exec: /usr/sbin/nginx
+
+middlewares: []
+
+services:
+    - endpoint: service.MyService
+      config: {}
+      middlewares: []

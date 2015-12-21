@@ -21,6 +21,8 @@ def after_scenario(context, scenario):
 def before_all(context):
     context.work_dir = tempfile.mkdtemp(prefix='leela_proj-')
 
+    #context.config.setup_logging()
+
 def after_all(context):
     if 'work_dir' in context:
         print('removing test dir {}'.format(context.work_dir))

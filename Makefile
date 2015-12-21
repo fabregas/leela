@@ -15,5 +15,5 @@ test:
 	@$(TEST_RUNNER)
 
 behave:
-	/usr/lib/python-exec/python3.4/behave tests/features/
+	behave tests/features/ --no-capture
 

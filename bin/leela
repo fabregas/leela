@@ -72,7 +72,11 @@ def start_server(project_path, config_name):
         raise RuntimeError('Project directory "{}" does not exists'
                            .format(project_path))
 
-    config_file = os.path.join(project_path, 'config', config_name + '.yaml')
+    if config_name.endswith('.yaml'):
+        config_file = config_name
+    else:
+        config_file = os.path.join(project_path, 'config',
+                                   config_name + '.yaml')
     if not os.path.exists(config_file):
         raise RuntimeError('Config file "{}" does not exists'
                            .format(config_file))
@@ -87,12 +91,18 @@ def start_server(project_path, config_name):
     bin_dir = os.path.abspath(os.path.dirname(__file__))
 
     loop = asyncio.get_event_loop()
+    retcode = dispatcher_daemon.RC_NEEDREBUILD # need to rebuild web
     try:
         while True:
+            if lconfig.monitor_changes and \
+                    retcode == dispatcher_daemon.RC_NEEDREBUILD:
+                ret = os.system('gulp')
+                if ret:
+                    raise RuntimeError('<gulp> failed!')
 
             retcode = dispatcher_daemon.start(
                 bin_dir, project_path, lconfig, loop=loop)
-            if lconfig.monitor_changes and retcode == 1:
+            if lconfig.monitor_changes and retcode > 0:
                 continue
             break
     except RuntimeError as err:
