@@ -26,11 +26,10 @@ class SmartDict(dict):
 
 
 class SmartRequest:
-    __slots__ = ('session', 'data', 'query', 'params', 'websocket')
+    __slots__ = ('session', 'data', 'query', 'params')
 
     def __init__(self):
         self.session = None
-        self.websocket = None
         self.query = SmartDict()
         self.params = SmartDict()
         self.data = SmartDict()
@@ -216,7 +215,7 @@ class leela_websocket(leela_get):
         if not ok:
             raise web.HTTPExpectationFailed(reason='Invalid WebSocket')
         ws.start(request)
-        ret.websocket = ws
+        ret.data['websocket'] = ws
         return ret
 
     @classmethod

@@ -66,7 +66,7 @@ All this decorators has uniform syntax:
 
 ```python
 @leela_*(obj_path, *, req_validator=None, resp_validator=None, **mw_params):
-def <some_method_name>(self, data):
+def <some_method_name>(self, request):
    ...
 
 ```
@@ -76,10 +76,56 @@ where:
    * `req_validator` - TBD
    * `resp_validator` - TBD
    * `mw_params` - the keyword arguments that should be passed to middlewares (see [Middlewares](/docs/middlewares.md) section for details)
-   * `data` - instance of [SmartRequest](#smartrequest)
+   * `request` - instance of [SmartRequest](#smartrequest)
 
-##### "raw" API method decorator
+
+**leela_get**, **leela_post**, **leela_put**, **leela_delete** are just wrappers for GET, POST, PUT and DELETE HTTP methods.
+
+**leela_form_post** wrapper provide key-value data from HTTP FORM in ``request.data``
+
+**leela_uploadstream** wrapper provide interface for uploading binary stream.
+``request.data.stream`` will contain file-like object for reading in this case
+
+For example:
+
+```python
+@leela_uploadstream('calc_checksum')
+def calc_checksum(self, req):
+    checksum = hashlib.sha1()
+    while True:
+        chunk = yield from req.data.stream.readany()
+        if not chunk:
+            break
+        checksum.update(chunk)
+    return checksum.hexdigest()
+```
+
+**leela_websoket** wrapper provide interface to server-side WebSocket.
+``request.data.websocket`` will contain instance of aiohttp.web.WebSocketResponse.
+Wrapped method MUST return this instance after websocket processing.
+
+For example:
+
+```python
+@leela_websocket('myws')
+def proc_ws(self, req):
+   ws = req.data.websocket
+   while True:
+       msg = yield from ws
+       if msg.data == 'close':
+            yield from ws.close()
+       else:
+            ws.send_str('echo: ' + msg.data)
+   print('websocket connection closed')
+   return ws
+```
+
+
+#### "raw" API method decorator
 Leela framework also provides **leela_raw** decorator for some custom HTTP request/response processing.
+
+Wrapped method MUST return instance of aiohttp.web.Response.
+
 Decorator syntax:
 
 ```python
@@ -102,35 +148,4 @@ SmartRequest instances has following attributes:
    * `params` - key-value structure (parsed from variable routes like `/user/{user_id}`)
    * `data` - key-value structure (parsed from HTTP body)
    * `session` - Session instance (or None if session middleware dont included in project)
-   * `websocket` - TBD
 
-
-### Decorators description
-
-##### leela_get
-
-TBD
-
-##### leela_post
-
-TBD
-
-##### leela_put
-
-TBD
-
-##### leela_delete
-
-TBD
-
-##### leela_form_post
-
-TBD
-
-##### leela_uploadstream
-
-TBD
-
-##### leela_websocket
-
-TBD
