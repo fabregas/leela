@@ -7,8 +7,8 @@ if len(sys.argv) != 2:
     print('Usage: %s <version>'%sys.argv[0])
     sys.exit(1)
 
-open('VERSION', 'w').write(sys.argv[1])
-ret = os.system('git add VERSION')
+open('leela/__init__.py', 'w').write('__version__ = "%s"'%sys.argv[1])
+ret = os.system('git add leela/__init__.py')
 if ret:
     print('ERROR! "git add" failed!')
     sys.exit(1)
