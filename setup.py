@@ -22,8 +22,6 @@ if __name__ == '__main__':
         keywords = ["web", "asyncio"],
         install_requires=[
             'PyYAML',
-            'aiohttp',
-            'asyncio_mongo'
-        ],
+            'aiohttp'],
     )
 
